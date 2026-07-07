@@ -186,8 +186,10 @@ public struct ScanSnapshot: Identifiable, Sendable {
             cancellationCheck: cancellationCheck
         ) else { return nil }
 
+        // Fresh id, like replacingNode: consumers key change detection on
+        // snapshot.id, so a same-id snapshot with a mutated tree reads as
+        // "nothing changed" and views don't refresh.
         return ScanSnapshot(
-            id: id,
             target: target,
             treeStore: updatedStore,
             startedAt: startedAt,
