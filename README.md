@@ -1,30 +1,29 @@
-<p align="center">
-  <img src="Packaging/icon.png" width="128" alt="Neodisk icon">
-</p>
+<h1 align="center">
+  <img src="Packaging/icon.png" width="128" alt="Neodisk icon"><br>
+  <p>Neodisk</p>
+</h1>
 
-<h1 align="center">Neodisk</h1>
-
 <p align="center">
-  Read-only MacOS disk space visualizer
+  Read-only MacOS disk space visualizer.
   Treemap on the <code>NeodiskKit</code> scan engine.
 </p>
 
----
+## About
 
 **Read-only by design.** Neodisk never modifies or deletes your files. 
 Instead, Reveal in Finder, Open, and Copy Path are the only file actions.
-Delete and clean up in Finder.
+Delete and clean up safely in Finder instead.
 
 ## Features
 
-- **Treemap** — Pinch to zoom, scroll to pan.
-- **Outline + file type statistics** — size-sorted file tree and per-type totals
-- **Fast scanning** — parallel traversal that backs off as the machine
+- Treemap: Pinch to zoom, scroll to pan.
+- Outline + file type statistics: size-sorted file tree and per-type totals
+- Fast scanning: parallel traversal that backs off as the machine
   heat-soaks, hard-link dedup, live progress, glob exclusions.
-- **Find anything** — `⌘F` fuzzy search over the entire scan. Quick Look on spacebar.
-- **Snapshots & changes** — completed scans persist and reopen instantly. The Changes (+/-)
+- Search: `⌘F` fuzzy search over the entire scan. Quick Look on spacebar.
+- Snapshots & changes: completed scans persist and reopen instantly. The Changes (+/-)
   toggle diffs against the previous scan to show what files grew, shrinked, got added, deleted.
-- **Multilingual** — the UI follows the macOS system language: English, Spanish,
+- Multilingual: the UI follows the macOS system language: English, Spanish,
   French, German, Italian, Brazilian Portuguese, Japanese, and Simplified Chinese.
 
 ## Build & Run
@@ -43,26 +42,22 @@ One package, strictly layered targets:
 
 ```
 Sources/
-├── NeodiskKit/   # UI-free scanning core: ScanEngine, contiguous
-│                 #   Int32-indexed file tree store, snapshots/cache,
-│                 #   hard-link dedup (derived from Radix)
+├── NeodiskKit/   # UI-free scanning core (derived from Radix)
 ├── NeodiskCLI/   # `diskscan` — the core's reference CLI
-├── TreemapKit/   # Pure treemap geometry: squarified layout, viewport,
-│                 #   cushion cell model + parallel rasterizer
-├── NeodiskUI/    # The app: SwiftUI/AppKit views, view model, scan lifecycle
+├── TreemapKit/   # Pure treemap geometry, viewport, rasterizer
+├── NeodiskUI/    # SwiftUI/AppKit views, view model, scan lifecycle
 └── Neodisk/      # Thin executable entry point
-
-Localization/     # .lproj string catalogs (one per language), copied into
-                  #   the .app bundle at package time
+Localization/     # .lproj string catalogs, one per language
 ```
 
 ## Planned
 
-- Horizontal scroll in the file outline — undecided. The itch: deep nesting
-  crops names until the sidebar is very wide, but the current behavior is
-  acceptable. If done, it must not interfere with search (same pane).
+- Add to Homebrew
+- Horizontal scroll in the file outline (undecided). The idea is that
+  deep nesting crops names until the sidebar is expanded very wide, but
+  the current behavior is fine. This should not interfere with search (same pane)
 - Multiplatform: native Windows and Linux versions (a lot of work, will
-  take a while).
+  take a while)
 
 ## Credits
 
@@ -77,4 +72,4 @@ Localization/     # .lproj string catalogs (one per language), copied into
 
 ## License
 
-GPL-3.0-or-later — see [LICENSE](LICENSE); Radix attribution is preserved there.
+GPL-3.0-or-later. See [LICENSE](LICENSE), Radix attribution is preserved there.
