@@ -1,0 +1,11 @@
+/* Neodisk — localized Info.plist values (English base).
+   These override the values in Info.plist for the matching locale. */
+
+"CFBundleDisplayName" = "Neodisk";
+"NSHumanReadableCopyright" = "© 2026 Neodisk contributors. GPLv3 License.";
+"NSDesktopFolderUsageDescription" = "Neodiskはファイルが使用するディスク容量を測定します。変更や削除は一切行いません。";
+"NSDocumentsFolderUsageDescription" = "Neodiskはファイルが使用するディスク容量を測定します。変更や削除は一切行いません。";
+"NSDownloadsFolderUsageDescription" = "Neodiskはファイルが使用するディスク容量を測定します。変更や削除は一切行いません。";
+"NSRemovableVolumesUsageDescription" = "Neodiskはリムーバブルボリュームのディスク使用量を測定します。変更や削除は一切行いません。";
+"NSNetworkVolumesUsageDescription" = "Neodiskはネットワークボリュームのディスク使用量を測定します。変更や削除は一切行いません。";
+"NSSystemAdministrationUsageDescription" = "フルディスクアクセスにより、Neodiskは保護された場所を測定できます。変更や削除は一切行いません。";

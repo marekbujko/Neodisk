@@ -1,0 +1,11 @@
+/* Neodisk — valores localizados do Info.plist (base em inglês).
+   Estes valores substituem os do Info.plist para o idioma correspondente. */
+
+"CFBundleDisplayName" = "Neodisk";
+"NSHumanReadableCopyright" = "© 2026 colaboradores do Neodisk. Licença GPLv3.";
+"NSDesktopFolderUsageDescription" = "O Neodisk mede quanto espaço em disco os arquivos usam. Ele nunca modifica ou exclui nada.";
+"NSDocumentsFolderUsageDescription" = "O Neodisk mede quanto espaço em disco os arquivos usam. Ele nunca modifica ou exclui nada.";
+"NSDownloadsFolderUsageDescription" = "O Neodisk mede quanto espaço em disco os arquivos usam. Ele nunca modifica ou exclui nada.";
+"NSRemovableVolumesUsageDescription" = "O Neodisk mede o uso de disco em volumes removíveis. Ele nunca modifica ou exclui nada.";
+"NSNetworkVolumesUsageDescription" = "O Neodisk mede o uso de disco em volumes de rede. Ele nunca modifica ou exclui nada.";
+"NSSystemAdministrationUsageDescription" = "O Acesso Total ao Disco permite que o Neodisk meça locais protegidos. Ele nunca modifica ou exclui nada.";

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>es</string>
+		<string>fr</string>
+		<string>de</string>
+		<string>it</string>
+		<string>pt-BR</string>
+		<string>ja</string>
+		<string>zh-Hans</string>
+	</array>
+	<key>CFBundleDisplayName</key>
+	<string>Neodisk</string>
+	<key>CFBundleExecutable</key>
+	<string>Neodisk</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.lucastakayasu.Neodisk</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Neodisk</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>__VERSION__</string>
+	<key>CFBundleVersion</key>
+	<string>__VERSION__</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Neodisk contributors. GPLv3 License.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Neodisk measures how much disk space files use. It never modifies or deletes anything.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Neodisk measures how much disk space files use. It never modifies or deletes anything.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Neodisk measures how much disk space files use. It never modifies or deletes anything.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Neodisk measures disk usage on removable volumes. It never modifies or deletes anything.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>Neodisk measures disk usage on network volumes. It never modifies or deletes anything.</string>
+	<key>NSSystemAdministrationUsageDescription</key>
+	<string>Full Disk Access lets Neodisk measure protected locations. It never modifies or deletes anything.</string>
+</dict>
+</plist>

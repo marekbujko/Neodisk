@@ -1,0 +1,196 @@
+/* Neodisk — base (English) localization.
+   Keys are the English source strings exactly as they appear in SwiftUI
+   Text/Button/Label/… literals (SwiftUI uses the literal itself as the lookup
+   key) plus the strings passed through NSLocalizedString / LocalizedStringKey
+   in code. Interpolations compile to %@ (all counts go through .formatted(),
+   so they are strings) or %lld. Translations may reorder with %1$@, %2$@, … */
+
+/* MARK: - Toolbar & window chrome */
+"Something went wrong" = "Something went wrong";
+"OK" = "OK";
+"Stop" = "Stop";
+"Stop the current scan" = "Stop the current scan";
+"Rescan" = "Rescan";
+"Scan %@ again" = "Scan %@ again";
+"Changes" = "Changes";
+"Loading the previous scan…" = "Loading the previous scan…";
+"Hide changes since the previous scan" = "Hide changes since the previous scan";
+"Show what grew since the previous scan" = "Show what grew since the previous scan";
+"File Kinds" = "File Kinds";
+"Hide file kind statistics" = "Hide file kind statistics";
+"Show file kind statistics" = "Show file kind statistics";
+"Settings" = "Settings";
+"Open Neodisk settings" = "Open Neodisk settings";
+
+/* MARK: - Welcome / empty state */
+"Choose a Folder or Disk" = "Choose a Folder or Disk";
+"Start from the sidebar, drop a folder into the window,\nor choose a location manually." = "Start from the sidebar, drop a folder into the window,\nor choose a location manually.";
+"Choose Folder…" = "Choose Folder…";
+"Scan %@" = "Scan %@";
+
+/* MARK: - Scanning progress */
+"Assembling results for %@…" = "Assembling results for %@…";
+"Scanning %@…" = "Scanning %@…";
+"%@ files · %@" = "%@ files · %@";
+"Stop Scan" = "Stop Scan";
+"Opening last scan of %@…" = "Opening last scan of %@…";
+
+/* MARK: - Scan failed */
+"Scan failed" = "Scan failed";
+"Try Again" = "Try Again";
+
+/* MARK: - Permission notice */
+"%@ locations couldn't be read — sizes may be underreported." = "%@ locations couldn't be read — sizes may be underreported.";
+"Grant Full Disk Access…" = "Grant Full Disk Access…";
+
+/* MARK: - Live scan strip */
+"Restart" = "Restart";
+"Stopped — showing last scan" = "Stopped — showing last scan";
+"Stopped — showing partial results" = "Stopped — showing partial results";
+"Last scanned %@ — refreshing…" = "Last scanned %@ — refreshing…";
+"Finishing up…" = "Finishing up…";
+"Scanning…" = "Scanning…";
+
+/* MARK: - Status bar */
+"Free space on this volume" = "Free space on this volume";
+"%@ smaller items in %@" = "%@ smaller items in %@";
+"Hover the treemap or select a row to inspect an item." = "Hover the treemap or select a row to inspect an item.";
+
+/* MARK: - Settings: sections & controls */
+"General" = "General";
+"Privacy" = "Privacy";
+"Appearance" = "Appearance";
+"Theme" = "Theme";
+"Scanning" = "Scanning";
+"Show hidden files while scanning" = "Show hidden files while scanning";
+"Automatically summarize folders with many small files" = "Automatically summarize folders with many small files";
+"Scan cloud storage folders" = "Scan cloud storage folders";
+"Summarizing folders with thousands of tiny files (like node_modules or caches) dramatically improves scan speed. When cloud scanning is off, ~/Library/CloudStorage (Google Drive, Dropbox, OneDrive) and iCloud Drive are skipped. Changes apply to the next scan." = "Summarizing folders with thousands of tiny files (like node_modules or caches) dramatically improves scan speed. When cloud scanning is off, ~/Library/CloudStorage (Google Drive, Dropbox, OneDrive) and iCloud Drive are skipped. Changes apply to the next scan.";
+"When opening a scanned location" = "When opening a scanned location";
+"Rescan automatically always refreshes behind the saved results; Smart skips the refresh when the last scan took a while; Show snapshot only always waits for Rescan Now." = "Rescan automatically always refreshes behind the saved results; Smart skips the refresh when the last scan took a while; Show snapshot only always waits for Rescan Now.";
+"Exclusions" = "Exclusions";
+"Use scan exclusions" = "Use scan exclusions";
+"One pattern per line. Trailing “/” matches folders; “*” is a wildcard." = "One pattern per line. Trailing “/” matches folders; “*” is a wildcard.";
+"Add Presets" = "Add Presets";
+"Show free space in treemap" = "Show free space in treemap";
+"Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately." = "Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately.";
+"Workspace" = "Workspace";
+"Show Welcome Screen" = "Show Welcome Screen";
+"Restore Defaults" = "Restore Defaults";
+
+/* MARK: - Settings: Privacy */
+"Full Disk Access" = "Full Disk Access";
+"Neodisk can scan ordinary folders immediately. For protected macOS locations such as Mail, Safari, Messages, and Library content, grant Full Disk Access in System Settings." = "Neodisk can scan ordinary folders immediately. For protected macOS locations such as Mail, Safari, Messages, and Library content, grant Full Disk Access in System Settings.";
+"Full Disk Access is enabled." = "Full Disk Access is enabled.";
+"Full Disk Access is not enabled." = "Full Disk Access is not enabled.";
+"Checking…" = "Checking…";
+"Open Full Disk Access Settings" = "Open Full Disk Access Settings";
+"Recheck" = "Recheck";
+"Note: running unbundled (swift run), Neodisk inherits its permissions from the terminal that launched it — grant Full Disk Access to that terminal app." = "Note: running unbundled (swift run), Neodisk inherits its permissions from the terminal that launched it — grant Full Disk Access to that terminal app.";
+"Read-Only Guarantee" = "Read-Only Guarantee";
+"Neodisk is a viewer: it never modifies or deletes files, and has no delete function at all. To remove something, use Reveal in Finder and delete it there." = "Neodisk is a viewer: it never modifies or deletes files, and has no delete function at all. To remove something, use Reveal in Finder and delete it there.";
+"Sidebar Folders" = "Sidebar Folders";
+"Folders you add are stored locally so they can appear in the sidebar." = "Folders you add are stored locally so they can appear in the sidebar.";
+"Clear Added Folders" = "Clear Added Folders";
+"Scan Snapshots" = "Scan Snapshots";
+"After each completed scan, Neodisk keeps the latest results for that location on this Mac so reopening it shows the last scan instantly while a fresh scan runs. Snapshots contain file names, paths, and sizes; they are stored only in Neodisk's local cache and never leave this Mac." = "After each completed scan, Neodisk keeps the latest results for that location on this Mac so reopening it shows the last scan instantly while a fresh scan runs. Snapshots contain file names, paths, and sizes; they are stored only in Neodisk's local cache and never leave this Mac.";
+"Size on disk" = "Size on disk";
+"Calculating…" = "Calculating…";
+"Clear Scan Snapshots" = "Clear Scan Snapshots";
+
+/* MARK: - Preference enum titles */
+"System" = "System";
+"Light" = "Light";
+"Dark" = "Dark";
+"Rescan automatically" = "Rescan automatically";
+"Smart" = "Smart";
+"Show snapshot only" = "Show snapshot only";
+"Categories" = "Categories";
+"Types" = "Types";
+
+/* MARK: - Welcome sheet (first launch) */
+"Welcome to Neodisk" = "Welcome to Neodisk";
+"Scan folders and disks to see where space is going.\nNeodisk is read-only: it never modifies or deletes files." = "Scan folders and disks to see where space is going.\nNeodisk is read-only: it never modifies or deletes files.";
+"Explore the treemap" = "Explore the treemap";
+"Hover to inspect. Click to select. Pinch or scroll to move around. Double-click or right-click to Reveal in Finder." = "Hover to inspect. Click to select. Pinch or scroll to move around. Double-click or right-click to Reveal in Finder.";
+"Read-only access" = "Read-only access";
+"Neodisk is purely a visualizer: it only ever reads your disk and cannot delete files or move them to the Trash — by design. To clean something up, right-click it, Reveal in Finder, and delete it there." = "Neodisk is purely a visualizer: it only ever reads your disk and cannot delete files or move them to the Trash — by design. To clean something up, right-click it, Reveal in Finder, and delete it there.";
+"Enabled" = "Enabled";
+"Not enabled" = "Not enabled";
+"Neodisk can read protected locations. You can start a complete scan now." = "Neodisk can read protected locations. You can start a complete scan now.";
+"Without it, protected locations (Mail, Safari, Messages, parts of Library) are skipped and totals are underreported. To enable:" = "Without it, protected locations (Mail, Safari, Messages, parts of Library) are skipped and totals are underreported. To enable:";
+"1. Open Privacy & Security → Full Disk Access.\n2. Turn it on for the app that launches Neodisk.\n3. Relaunch Neodisk." = "1. Open Privacy & Security → Full Disk Access.\n2. Turn it on for the app that launches Neodisk.\n3. Relaunch Neodisk.";
+"1. Open Privacy & Security → Full Disk Access.\n2. Turn it on for Neodisk.\n3. Relaunch Neodisk." = "1. Open Privacy & Security → Full Disk Access.\n2. Turn it on for Neodisk.\n3. Relaunch Neodisk.";
+"Continue" = "Continue";
+
+/* MARK: - Outline pane */
+"Search entire scan" = "Search entire scan";
+"Clear search" = "Clear search";
+"Reveal in Finder" = "Reveal in Finder";
+"Open" = "Open";
+"Copy Path" = "Copy Path";
+"Expand Contents" = "Expand Contents";
+"No matches" = "No matches";
+"Top %@ of %@ matches — refine to narrow" = "Top %@ of %@ matches — refine to narrow";
+
+/* MARK: - File kinds pane */
+"Show every file of this kind" = "Show every file of this kind";
+"Back to file kinds" = "Back to file kinds";
+"Loading…" = "Loading…";
+"Filter by name" = "Filter by name";
+"%@ files" = "%@ files";
+"Largest %@ of %@ — search to narrow" = "Largest %@ of %@ — search to narrow";
+
+/* MARK: - File kind category names */
+"Videos" = "Videos";
+"Images" = "Images";
+"Audio" = "Audio";
+"Documents" = "Documents";
+"Archives & Disk Images" = "Archives & Disk Images";
+"Code & Development" = "Code & Development";
+"Data & Machine Learning" = "Data & Machine Learning";
+"Applications" = "Applications";
+"System Data" = "System Data";
+"Summarized Folders" = "Summarized Folders";
+"Summarized Contents" = "Summarized Contents";
+"Other" = "Other";
+"Folder" = "Folder";
+"Alias" = "Alias";
+"No Extension" = "No Extension";
+
+/* MARK: - Sidebar */
+"Smart Locations" = "Smart Locations";
+"Folders" = "Folders";
+"Add Folder…" = "Add Folder…";
+"Scan any folder or volume and keep it in the sidebar" = "Scan any folder or volume and keep it in the sidebar";
+"Scanned %@" = "Scanned %@";
+"Remove from Sidebar" = "Remove from Sidebar";
+"Remove %lld Folders from Sidebar" = "Remove %lld Folders from Sidebar";
+"v%@ — Experimental, expect crashes" = "v%@ — Experimental, expect crashes";
+
+/* MARK: - Snapshot notice */
+"Showing scan from %@" = "Showing scan from %@";
+"Rescanning took about %@ last time." = "Rescanning took about %@ last time.";
+"Keep the snapshot and dismiss" = "Keep the snapshot and dismiss";
+"Rescan Now" = "Rescan Now";
+
+/* MARK: - Warnings panel */
+"Warnings" = "Warnings";
+"Dismiss all warnings" = "Dismiss all warnings";
+"Dismiss this warning" = "Dismiss this warning";
+
+/* MARK: - Menu bar commands */
+"Find" = "Find";
+"Show Locations Sidebar" = "Show Locations Sidebar";
+"Hide Locations Sidebar" = "Hide Locations Sidebar";
+"Show File Kinds" = "Show File Kinds";
+"Hide File Kinds" = "Hide File Kinds";
+
+/* MARK: - System dialogs & treemap */
+"Scan" = "Scan";
+"Choose a folder or mounted volume to analyze." = "Choose a folder or mounted volume to analyze.";
+"macOS could not open the item at %@." = "macOS could not open the item at %@.";
+"macOS could not copy the path for %@." = "macOS could not copy the path for %@.";
+"The item at %@ is no longer available for Quick Look." = "The item at %@ is no longer available for Quick Look.";
+"Free Space" = "Free Space";
+"just now" = "just now";

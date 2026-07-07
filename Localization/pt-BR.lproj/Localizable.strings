@@ -1,0 +1,197 @@
+/* Neodisk — localização brasileira (pt-BR).
+   As chaves são as strings de origem em inglês, exatamente como aparecem nos
+   literais SwiftUI Text/Button/Label/… (o SwiftUI usa o próprio literal como
+   chave de busca), além das strings passadas por NSLocalizedString /
+   LocalizedStringKey no código. As interpolações compilam para %@ (todas as
+   contagens passam por .formatted(), portanto são strings) ou %lld. As
+   traduções podem reordenar com %1$@, %2$@, … */
+
+/* MARK: - Toolbar & window chrome */
+"Something went wrong" = "Algo deu errado";
+"OK" = "OK";
+"Stop" = "Parar";
+"Stop the current scan" = "Parar a análise atual";
+"Rescan" = "Analisar novamente";
+"Scan %@ again" = "Analisar %@ novamente";
+"Changes" = "Alterações";
+"Loading the previous scan…" = "Carregando a análise anterior…";
+"Hide changes since the previous scan" = "Ocultar alterações desde a análise anterior";
+"Show what grew since the previous scan" = "Mostrar o que cresceu desde a análise anterior";
+"File Kinds" = "Tipos de Arquivo";
+"Hide file kind statistics" = "Ocultar estatísticas de tipos de arquivo";
+"Show file kind statistics" = "Mostrar estatísticas de tipos de arquivo";
+"Settings" = "Ajustes";
+"Open Neodisk settings" = "Abrir os ajustes do Neodisk";
+
+/* MARK: - Welcome / empty state */
+"Choose a Folder or Disk" = "Escolha uma Pasta ou Disco";
+"Start from the sidebar, drop a folder into the window,\nor choose a location manually." = "Comece pela barra lateral, arraste uma pasta para a janela\nou escolha um local manualmente.";
+"Choose Folder…" = "Escolher Pasta…";
+"Scan %@" = "Analisar %@";
+
+/* MARK: - Scanning progress */
+"Assembling results for %@…" = "Reunindo resultados de %@…";
+"Scanning %@…" = "Analisando %@…";
+"%@ files · %@" = "%@ arquivos · %@";
+"Stop Scan" = "Parar Análise";
+"Opening last scan of %@…" = "Abrindo a última análise de %@…";
+
+/* MARK: - Scan failed */
+"Scan failed" = "Falha na análise";
+"Try Again" = "Tentar Novamente";
+
+/* MARK: - Permission notice */
+"%@ locations couldn't be read — sizes may be underreported." = "%@ locais não puderam ser lidos — os tamanhos podem estar subestimados.";
+"Grant Full Disk Access…" = "Conceder Acesso Total ao Disco…";
+
+/* MARK: - Live scan strip */
+"Restart" = "Reiniciar";
+"Stopped — showing last scan" = "Interrompida — mostrando a última análise";
+"Stopped — showing partial results" = "Interrompida — mostrando resultados parciais";
+"Last scanned %@ — refreshing…" = "Última análise %@ — atualizando…";
+"Finishing up…" = "Finalizando…";
+"Scanning…" = "Analisando…";
+
+/* MARK: - Status bar */
+"Free space on this volume" = "Espaço livre neste volume";
+"%@ smaller items in %@" = "%@ itens menores em %@";
+"Hover the treemap or select a row to inspect an item." = "Passe o cursor sobre o treemap ou selecione uma linha para inspecionar um item.";
+
+/* MARK: - Settings: sections & controls */
+"General" = "Geral";
+"Privacy" = "Privacidade";
+"Appearance" = "Aparência";
+"Theme" = "Tema";
+"Scanning" = "Análise";
+"Show hidden files while scanning" = "Mostrar arquivos ocultos durante a análise";
+"Automatically summarize folders with many small files" = "Resumir automaticamente pastas com muitos arquivos pequenos";
+"Scan cloud storage folders" = "Analisar pastas de armazenamento na nuvem";
+"Summarizing folders with thousands of tiny files (like node_modules or caches) dramatically improves scan speed. When cloud scanning is off, ~/Library/CloudStorage (Google Drive, Dropbox, OneDrive) and iCloud Drive are skipped. Changes apply to the next scan." = "Resumir pastas com milhares de arquivos minúsculos (como node_modules ou caches) melhora muito a velocidade da análise. Quando a análise na nuvem está desativada, ~/Library/CloudStorage (Google Drive, Dropbox, OneDrive) e o iCloud Drive são ignorados. As alterações se aplicam à próxima análise.";
+"When opening a scanned location" = "Ao abrir um local já analisado";
+"Rescan automatically always refreshes behind the saved results; Smart skips the refresh when the last scan took a while; Show snapshot only always waits for Rescan Now." = "Analisar novamente automaticamente sempre atualiza por trás dos resultados salvos; Inteligente pula a atualização quando a última análise demorou; Mostrar apenas o snapshot sempre espera por Analisar Agora.";
+"Exclusions" = "Exclusões";
+"Use scan exclusions" = "Usar exclusões de análise";
+"One pattern per line. Trailing “/” matches folders; “*” is a wildcard." = "Um padrão por linha. “/” no final corresponde a pastas; “*” é um curinga.";
+"Add Presets" = "Adicionar Predefinições";
+"Show free space in treemap" = "Mostrar espaço livre no treemap";
+"Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately." = "O espaço livre aparece apenas para análises de volume e usa a capacidade disponível do macOS, que pode incluir espaço APFS descartável. Aplica-se imediatamente.";
+"Workspace" = "Espaço de Trabalho";
+"Show Welcome Screen" = "Mostrar Tela de Boas-Vindas";
+"Restore Defaults" = "Restaurar Padrões";
+
+/* MARK: - Settings: Privacy */
+"Full Disk Access" = "Acesso Total ao Disco";
+"Neodisk can scan ordinary folders immediately. For protected macOS locations such as Mail, Safari, Messages, and Library content, grant Full Disk Access in System Settings." = "O Neodisk pode analisar pastas comuns imediatamente. Para locais protegidos do macOS, como Mail, Safari, Messages e conteúdo da Library, conceda Acesso Total ao Disco nos Ajustes do Sistema.";
+"Full Disk Access is enabled." = "O Acesso Total ao Disco está ativado.";
+"Full Disk Access is not enabled." = "O Acesso Total ao Disco não está ativado.";
+"Checking…" = "Verificando…";
+"Open Full Disk Access Settings" = "Abrir Ajustes de Acesso Total ao Disco";
+"Recheck" = "Verificar Novamente";
+"Note: running unbundled (swift run), Neodisk inherits its permissions from the terminal that launched it — grant Full Disk Access to that terminal app." = "Nota: ao rodar sem empacotamento (swift run), o Neodisk herda as permissões do terminal que o iniciou — conceda Acesso Total ao Disco a esse aplicativo de terminal.";
+"Read-Only Guarantee" = "Garantia Somente Leitura";
+"Neodisk is a viewer: it never modifies or deletes files, and has no delete function at all. To remove something, use Reveal in Finder and delete it there." = "O Neodisk é um visualizador: ele nunca modifica ou exclui arquivos, e não tem função de exclusão alguma. Para remover algo, use Mostrar no Finder e exclua por lá.";
+"Sidebar Folders" = "Pastas da Barra Lateral";
+"Folders you add are stored locally so they can appear in the sidebar." = "As pastas que você adiciona são armazenadas localmente para que possam aparecer na barra lateral.";
+"Clear Added Folders" = "Limpar Pastas Adicionadas";
+"Scan Snapshots" = "Snapshots de Análise";
+"After each completed scan, Neodisk keeps the latest results for that location on this Mac so reopening it shows the last scan instantly while a fresh scan runs. Snapshots contain file names, paths, and sizes; they are stored only in Neodisk's local cache and never leave this Mac." = "Após cada análise concluída, o Neodisk mantém os resultados mais recentes desse local neste Mac, para que reabri-lo mostre a última análise instantaneamente enquanto uma nova análise é executada. Os snapshots contêm nomes de arquivos, caminhos e tamanhos; eles ficam armazenados apenas no cache local do Neodisk e nunca saem deste Mac.";
+"Size on disk" = "Tamanho no disco";
+"Calculating…" = "Calculando…";
+"Clear Scan Snapshots" = "Limpar Snapshots de Análise";
+
+/* MARK: - Preference enum titles */
+"System" = "Sistema";
+"Light" = "Claro";
+"Dark" = "Escuro";
+"Rescan automatically" = "Analisar novamente automaticamente";
+"Smart" = "Inteligente";
+"Show snapshot only" = "Mostrar apenas o snapshot";
+"Categories" = "Categorias";
+"Types" = "Tipos";
+
+/* MARK: - Welcome sheet (first launch) */
+"Welcome to Neodisk" = "Bem-vindo ao Neodisk";
+"Scan folders and disks to see where space is going.\nNeodisk is read-only: it never modifies or deletes files." = "Analise pastas e discos para ver para onde o espaço está indo.\nO Neodisk é somente leitura: nunca modifica ou exclui arquivos.";
+"Explore the treemap" = "Explore o treemap";
+"Hover to inspect. Click to select. Pinch or scroll to move around. Double-click or right-click to Reveal in Finder." = "Passe o cursor para inspecionar. Clique para selecionar. Aproxime ou afaste os dedos, ou role, para navegar. Dê um clique duplo ou clique com o botão direito para Mostrar no Finder.";
+"Read-only access" = "Acesso somente leitura";
+"Neodisk is purely a visualizer: it only ever reads your disk and cannot delete files or move them to the Trash — by design. To clean something up, right-click it, Reveal in Finder, and delete it there." = "O Neodisk é puramente um visualizador: ele apenas lê seu disco e não pode excluir arquivos nem movê-los para a Lixeira — por design. Para limpar algo, clique com o botão direito, escolha Mostrar no Finder e exclua por lá.";
+"Enabled" = "Ativado";
+"Not enabled" = "Não ativado";
+"Neodisk can read protected locations. You can start a complete scan now." = "O Neodisk pode ler locais protegidos. Você já pode iniciar uma análise completa.";
+"Without it, protected locations (Mail, Safari, Messages, parts of Library) are skipped and totals are underreported. To enable:" = "Sem isso, locais protegidos (Mail, Safari, Messages, partes da Library) são ignorados e os totais ficam subestimados. Para ativar:";
+"1. Open Privacy & Security → Full Disk Access.\n2. Turn it on for the app that launches Neodisk.\n3. Relaunch Neodisk." = "1. Abra Privacidade e Segurança → Acesso Total ao Disco.\n2. Ative para o aplicativo que inicia o Neodisk.\n3. Reinicie o Neodisk.";
+"1. Open Privacy & Security → Full Disk Access.\n2. Turn it on for Neodisk.\n3. Relaunch Neodisk." = "1. Abra Privacidade e Segurança → Acesso Total ao Disco.\n2. Ative para o Neodisk.\n3. Reinicie o Neodisk.";
+"Continue" = "Continuar";
+
+/* MARK: - Outline pane */
+"Search entire scan" = "Buscar em toda a análise";
+"Clear search" = "Limpar busca";
+"Reveal in Finder" = "Mostrar no Finder";
+"Open" = "Abrir";
+"Copy Path" = "Copiar Caminho";
+"Expand Contents" = "Expandir Conteúdo";
+"No matches" = "Nenhum resultado";
+"Top %@ of %@ matches — refine to narrow" = "Melhores %@ de %@ resultados — refine para reduzir";
+
+/* MARK: - File kinds pane */
+"Show every file of this kind" = "Mostrar todos os arquivos deste tipo";
+"Back to file kinds" = "Voltar aos tipos de arquivo";
+"Loading…" = "Carregando…";
+"Filter by name" = "Filtrar por nome";
+"%@ files" = "%@ arquivos";
+"Largest %@ of %@ — search to narrow" = "Maiores %@ de %@ — busque para reduzir";
+
+/* MARK: - File kind category names */
+"Videos" = "Vídeos";
+"Images" = "Imagens";
+"Audio" = "Áudio";
+"Documents" = "Documentos";
+"Archives & Disk Images" = "Arquivos Compactados e Imagens de Disco";
+"Code & Development" = "Código e Desenvolvimento";
+"Data & Machine Learning" = "Dados e Aprendizado de Máquina";
+"Applications" = "Aplicativos";
+"System Data" = "Dados do Sistema";
+"Summarized Folders" = "Pastas Resumidas";
+"Summarized Contents" = "Conteúdo Resumido";
+"Other" = "Outros";
+"Folder" = "Pasta";
+"Alias" = "Alias";
+"No Extension" = "Sem Extensão";
+
+/* MARK: - Sidebar */
+"Smart Locations" = "Locais Inteligentes";
+"Folders" = "Pastas";
+"Add Folder…" = "Adicionar Pasta…";
+"Scan any folder or volume and keep it in the sidebar" = "Analise qualquer pasta ou volume e mantenha-o na barra lateral";
+"Scanned %@" = "Analisado %@";
+"Remove from Sidebar" = "Remover da Barra Lateral";
+"Remove %lld Folders from Sidebar" = "Remover %lld Pastas da Barra Lateral";
+"v%@ — Experimental, expect crashes" = "v%@ — Experimental, sujeito a falhas";
+
+/* MARK: - Snapshot notice */
+"Showing scan from %@" = "Mostrando análise de %@";
+"Rescanning took about %@ last time." = "A última nova análise levou cerca de %@.";
+"Keep the snapshot and dismiss" = "Manter o snapshot e dispensar";
+"Rescan Now" = "Analisar Agora";
+
+/* MARK: - Warnings panel */
+"Warnings" = "Avisos";
+"Dismiss all warnings" = "Dispensar todos os avisos";
+"Dismiss this warning" = "Dispensar este aviso";
+
+/* MARK: - Menu bar commands */
+"Find" = "Buscar";
+"Show Locations Sidebar" = "Mostrar Barra Lateral de Locais";
+"Hide Locations Sidebar" = "Ocultar Barra Lateral de Locais";
+"Show File Kinds" = "Mostrar Tipos de Arquivo";
+"Hide File Kinds" = "Ocultar Tipos de Arquivo";
+
+/* MARK: - System dialogs & treemap */
+"Scan" = "Analisar";
+"Choose a folder or mounted volume to analyze." = "Escolha uma pasta ou volume montado para analisar.";
+"macOS could not open the item at %@." = "O macOS não conseguiu abrir o item em %@.";
+"macOS could not copy the path for %@." = "O macOS não conseguiu copiar o caminho de %@.";
+"The item at %@ is no longer available for Quick Look." = "O item em %@ não está mais disponível para a Visualização Rápida.";
+"Free Space" = "Espaço Livre";
+"just now" = "agora mesmo";
