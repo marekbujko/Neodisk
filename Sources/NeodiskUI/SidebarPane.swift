@@ -133,8 +133,13 @@ struct SidebarPane: View {
         .onChange(of: model.coordinator.selectedTarget, initial: true) { _, target in
             // Keep the highlighted row in sync with what is being scanned
             // (drag & drop, welcome buttons, Add Folder…).
-            if let target, selection != [target.id] {
-                selection = [target.id]
+            if let target {
+                if selection != [target.id] {
+                    selection = [target.id]
+                }
+            } else if !selection.isEmpty {
+                // A cleared scan must not leave a stale highlighted row.
+                selection = []
             }
         }
         .task {
