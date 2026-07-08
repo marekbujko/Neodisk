@@ -198,7 +198,6 @@
 "Scanned %@" = "スキャン: %@";
 "Remove from Sidebar" = "サイドバーから削除";
 "Remove %lld Folders from Sidebar" = "%lld個のフォルダをサイドバーから削除";
-"v%@ — Experimental, expect crashes" = "v%@ — 実験的、クラッシュに注意";
 
 /* MARK: - Snapshot notice */
 "Showing scan from %@" = "%@のスキャンを表示中";

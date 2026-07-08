@@ -198,7 +198,6 @@
 "Scanned %@" = "%@ gescannt";
 "Remove from Sidebar" = "Aus Seitenleiste entfernen";
 "Remove %lld Folders from Sidebar" = "%lld Ordner aus Seitenleiste entfernen";
-"v%@ — Experimental, expect crashes" = "v%@ — Experimentell, Abstürze möglich";
 
 /* MARK: - Snapshot notice */
 "Showing scan from %@" = "Scan vom %@ wird angezeigt";

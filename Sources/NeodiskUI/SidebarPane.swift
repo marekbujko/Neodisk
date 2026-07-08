@@ -93,7 +93,7 @@ struct SidebarPane: View {
             model.addDroppedFolders(urls)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Text("v\(AppVersion.string) — Experimental, expect crashes")
+            Text("v\(AppVersion.string)")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -198,7 +198,6 @@
 "Scanned %@" = "Analysé %@";
 "Remove from Sidebar" = "Retirer de la barre latérale";
 "Remove %lld Folders from Sidebar" = "Retirer %lld dossiers de la barre latérale";
-"v%@ — Experimental, expect crashes" = "v%@ — Expérimental, des plantages sont à prévoir";
 
 /* MARK: - Snapshot notice */
 "Showing scan from %@" = "Affichage de l'analyse effectuée %@";

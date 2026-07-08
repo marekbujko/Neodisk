@@ -198,7 +198,6 @@
 "Scanned %@" = "Scanned %@";
 "Remove from Sidebar" = "Remove from Sidebar";
 "Remove %lld Folders from Sidebar" = "Remove %lld Folders from Sidebar";
-"v%@ — Experimental, expect crashes" = "v%@ — Experimental, expect crashes";
 
 /* MARK: - Snapshot notice */
 "Showing scan from %@" = "Showing scan from %@";

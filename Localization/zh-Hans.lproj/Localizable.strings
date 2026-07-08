@@ -198,7 +198,6 @@
 "Scanned %@" = "已扫描 %@";
 "Remove from Sidebar" = "从边栏中移除";
 "Remove %lld Folders from Sidebar" = "从边栏中移除 %lld 个文件夹";
-"v%@ — Experimental, expect crashes" = "v%@ — 实验版本，可能崩溃";
 
 /* MARK: - 快照提示 */
 "Showing scan from %@" = "显示 %@ 的扫描结果";
