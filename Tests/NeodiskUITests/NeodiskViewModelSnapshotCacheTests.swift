@@ -230,6 +230,92 @@ import NeodiskKit
         #expect(model.diff.baseline == nil)
     }
 
+    @Test func testDiffBaselinePrefetchesAfterSecondScanAndTogglesInstantly() async throws {
+        let environment = try TestEnvironment()
+        defer { environment.tearDown() }
+        let target = makeTestTarget("/cache-vm/prefetched")
+        environment.pinnedFolderStore.add(target)
+        let model = environment.makeModel()
+
+        // First scan: only one snapshot exists, so there is nothing to
+        // prefetch a baseline from.
+        model.startScan(target)
+        environment.scanService.yield(
+            .finished(makeSizedSnapshot(target: target, fileSize: 10)),
+            scanIndex: 0
+        )
+        environment.scanService.finish(scanIndex: 0)
+        try await waitUntilAsync("first scan persisted") {
+            await environment.cache.loadSnapshot(for: target) != nil
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(model.diff.prefetchedBaseline == nil)
+        #expect(!model.diff.isLoading)
+
+        // Second scan: rotation makes a previous snapshot, and the default
+        // "prepare Changes" preference prefetches its baseline unasked.
+        model.rescan()
+        environment.scanService.yield(
+            .finished(makeSizedSnapshot(target: target, fileSize: 25)),
+            scanIndex: 1
+        )
+        environment.scanService.finish(scanIndex: 1)
+        try await waitUntilAsync("baseline prefetched") {
+            model.diff.prefetchedBaseline != nil
+        }
+        #expect(!model.diff.isLoading)
+        #expect(!model.diff.isShowing)
+
+        // The toggle must not need another load: the baseline shows
+        // synchronously and carries the previous scan's sizes.
+        model.diff.toggle()
+        let baseline = try #require(model.diff.baseline)
+        #expect(baseline.allocatedSize(forNodeID: target.id + "/file.txt") == 10)
+    }
+
+    @Test func testAutoDuplicateScanPreferenceStartsScanAfterFinish() async throws {
+        let environment = try TestEnvironment()
+        defer { environment.tearDown() }
+        let target = makeTestTarget("/cache-vm/auto-duplicates")
+        environment.pinnedFolderStore.add(target)
+        let model = environment.makeModel()
+        let preferences = AppPreferences(defaults: environment.defaults)
+        preferences.autoScanDuplicates = true
+        model.preferences = preferences
+
+        model.startScan(target)
+        environment.scanService.yield(.finished(makeSimpleSnapshot(target: target)), scanIndex: 0)
+        environment.scanService.finish(scanIndex: 0)
+
+        // The single-file snapshot has no duplicate candidates, so the
+        // auto-started scan finishes immediately with empty results — the
+        // point is that it ran without a click.
+        try await waitUntilAsync("duplicate scan auto-started and finished") {
+            model.duplicates.results != nil
+        }
+        #expect(model.duplicates.results?.groups.isEmpty == true)
+    }
+
+    @Test func testDuplicateScanStaysIdleWithoutAutoScanPreference() async throws {
+        let environment = try TestEnvironment()
+        defer { environment.tearDown() }
+        let target = makeTestTarget("/cache-vm/manual-duplicates")
+        environment.pinnedFolderStore.add(target)
+        let model = environment.makeModel()
+
+        model.startScan(target)
+        environment.scanService.yield(.finished(makeSimpleSnapshot(target: target)), scanIndex: 0)
+        environment.scanService.finish(scanIndex: 0)
+        try await waitUntilAsync("scan persisted to cache") {
+            await environment.cache.loadSnapshot(for: target) != nil
+        }
+
+        guard case .idle = model.duplicates.phase else {
+            Issue.record("Duplicate scan ran without the opt-in preference.")
+            return
+        }
+    }
+
     // MARK: - Fixtures
 
     private struct TestEnvironment {

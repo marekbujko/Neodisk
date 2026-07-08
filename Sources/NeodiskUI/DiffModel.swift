@@ -6,6 +6,11 @@
 //  the previous snapshot, plus the toggle/loading choreography. Owned by
 //  NeodiskViewModel as `model.diff`.
 //
+//  The baseline usually loads before the toggle is pressed: right after a
+//  scan finishes (and its predecessor rotates into the previous slot), the
+//  "prepare Changes after each scan" preference prefetches the baseline in
+//  the background so the toggle responds instantly.
+//
 
 import Foundation
 import Observation
@@ -18,14 +23,26 @@ final class DiffModel {
     /// means "changes since last scan" mode: the outline gains a Δ column
     /// and sorts by growth.
     private(set) var baseline: ScanSizeBaseline?
-    /// True while the previous snapshot decodes for diff mode.
+    /// True while the previous snapshot decodes for diff mode. Prefetches
+    /// set it too: the toolbar spinner is how "Changes is being prepared"
+    /// shows.
     private(set) var isLoading = false
+
+    /// A baseline decoded ahead of the toggle, waiting to show instantly.
+    /// Internal (not private) so tests can observe the prefetch.
+    @ObservationIgnored private(set) var prefetchedBaseline: ScanSizeBaseline?
+    /// True when the finished load should go on screen: user-initiated
+    /// loads always; a prefetch only if the toggle was pressed mid-load.
+    @ObservationIgnored private var showsWhenLoaded = false
+    /// Bumped whenever an in-flight load's result would be stale (a newer
+    /// load, or any snapshot change); older completions are dropped.
+    @ObservationIgnored private var loadGeneration = 0
 
     @ObservationIgnored private let coordinator: ScanCoordinator
     @ObservationIgnored private let snapshotCache: ScanSnapshotCache
     /// Weak parent: diffing consults the model's snapshot-cache index
-    /// (`cachedScanInfo`) and corrects it when the previous snapshot turns
-    /// out to be gone.
+    /// (`cachedScanInfo`), corrects it when the previous snapshot turns
+    /// out to be gone, and reads the prefetch preference.
     @ObservationIgnored weak var model: NeodiskViewModel?
 
     init(coordinator: ScanCoordinator, snapshotCache: ScanSnapshotCache) {
@@ -48,30 +65,57 @@ final class DiffModel {
     func toggle() {
         if baseline != nil {
             baseline = nil
+            // An in-flight reload must not resurrect the mode it just left.
+            showsWhenLoaded = false
             return
         }
-        guard canShow, !isLoading,
-              let target = coordinator.snapshot?.target else { return }
-        load(for: target)
+        guard canShow, let target = coordinator.snapshot?.target else { return }
+        if let prefetchedBaseline, prefetchedBaseline.targetID == target.id {
+            baseline = prefetchedBaseline
+            return
+        }
+        if isLoading {
+            // The prefetch is still decoding; show it the moment it lands.
+            showsWhenLoaded = true
+            return
+        }
+        load(for: target, showsOnCompletion: true)
     }
 
-    /// A baseline only makes sense against its own target.
+    /// A baseline only makes sense against its own target, and a prefetched
+    /// one only against the exact snapshot it was decoded alongside — a new
+    /// tree on screen invalidates both it and any load in flight.
     func snapshotDidChange(_ snapshot: ScanSnapshot?) {
+        loadGeneration += 1
+        prefetchedBaseline = nil
+        showsWhenLoaded = false
+        isLoading = false
         if let baseline, snapshot?.target.id != baseline.targetID {
             self.baseline = nil
         }
     }
 
-    /// Saving the displayed snapshot rotated its predecessor: a diff in
-    /// progress now compares against the wrong generation, so rebase it on
-    /// the freshly rotated previous snapshot.
-    func rebaseAfterSnapshotRotation(for target: ScanTarget) {
-        guard baseline?.targetID == target.id else { return }
-        load(for: target)
+    /// Saving the displayed snapshot rotated its predecessor. A baseline on
+    /// screen now compares against the wrong generation, so rebase it; with
+    /// diff mode off, prefetch the fresh previous snapshot instead when the
+    /// preference asks for that. Either path needs two scans of this target
+    /// on disk — after its first ever scan `canShow` is false and nothing
+    /// loads, so the toggle simply stays disabled.
+    func snapshotWasRotated(for target: ScanTarget) {
+        guard coordinator.snapshot?.target.id == target.id else { return }
+        prefetchedBaseline = nil
+        if baseline?.targetID == target.id {
+            load(for: target, showsOnCompletion: true)
+        } else if canShow, model?.preferences?.prepareChangesAfterScan ?? true {
+            load(for: target, showsOnCompletion: false)
+        }
     }
 
-    private func load(for target: ScanTarget) {
+    private func load(for target: ScanTarget, showsOnCompletion: Bool) {
         isLoading = true
+        showsWhenLoaded = showsOnCompletion
+        loadGeneration += 1
+        let generation = loadGeneration
         Task { [weak self, snapshotCache] in
             // Decode happens on the cache actor, the million-node baseline
             // build in a detached task; neither blocks the main actor.
@@ -79,11 +123,16 @@ final class DiffModel {
             let baseline = await Task.detached(priority: .userInitiated) {
                 previous.map(ScanSizeBaseline.init)
             }.value
-            guard let self else { return }
+            guard let self, self.loadGeneration == generation else { return }
             self.isLoading = false
+            let showsNow = self.showsWhenLoaded
+            self.showsWhenLoaded = false
             guard self.coordinator.snapshot?.target.id == target.id else { return }
             if let baseline {
-                self.baseline = baseline
+                self.prefetchedBaseline = baseline
+                if showsNow {
+                    self.baseline = baseline
+                }
             } else {
                 // The previous snapshot is gone (corrupt and deleted, or
                 // cleared): reflect that so the toggle disables.

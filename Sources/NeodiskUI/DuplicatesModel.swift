@@ -2,10 +2,12 @@
 //  DuplicatesModel.swift
 //  Neodisk
 //
-//  Duplicate-finder state for the statistics panel's Duplicates tab: an
-//  on-demand content scan of the displayed snapshot (hashing costs real
-//  I/O, so it never runs unasked), its results, and the drill-in into one
-//  duplicate group. Owned by NeodiskViewModel as `model.duplicates`.
+//  Duplicate-finder state for the statistics panel's Duplicates tab: a
+//  content scan of the displayed snapshot, its results, and the drill-in
+//  into one duplicate group. Owned by NeodiskViewModel as
+//  `model.duplicates`. Hashing costs real I/O, so it only runs asked-for:
+//  via the Find Duplicates button, or right after a scan when the opt-in
+//  "find duplicates automatically" preference is on.
 //
 //  Read-only, like the app promises: the finder only reads file contents;
 //  cleaning up happens in Finder.

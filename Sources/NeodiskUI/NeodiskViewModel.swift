@@ -178,7 +178,14 @@ final class NeodiskViewModel {
         }
 
         coordinator.onScanFinished = { [weak self] snapshot in
-            self?.persistCompletedSnapshot(snapshot)
+            guard let self else { return }
+            self.persistCompletedSnapshot(snapshot)
+            // Opt-in convenience: kick off the duplicate content scan the
+            // moment a scan lands, so the Duplicates tab is ready (or at
+            // least underway) by the time the user opens it.
+            if self.preferences?.autoScanDuplicates == true {
+                self.duplicates.startScan()
+            }
         }
 
         // Drop cache entries for locations no longer in the sidebar and
@@ -466,8 +473,9 @@ final class NeodiskViewModel {
             do {
                 try await snapshotCache.save(snapshot)
                 // Saving rotated the displayed scan's predecessor; an
-                // active diff of this target must rebase on it.
-                self?.diff.rebaseAfterSnapshotRotation(for: snapshot.target)
+                // active diff of this target must rebase on it, and an
+                // inactive one may prefetch its baseline.
+                self?.diff.snapshotWasRotated(for: snapshot.target)
             } catch {
                 FileHandle.standardError.write(
                     Data("Neodisk: failed to persist scan snapshot: \(error)\n".utf8)

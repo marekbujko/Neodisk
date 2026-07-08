@@ -69,6 +69,12 @@ final class AppPreferences: ObservableObject {
     @AppStorage("exclusionPatternsText") var exclusionPatternsText =
         ScanExclusionMatcher.commonPresetPatterns.joined(separator: "\n")
     @AppStorage("autoRescanPolicy") var autoRescanPolicyRaw = AutoRescanPolicy.smart.rawValue
+    /// Decode the previous snapshot right after a scan finishes, so the
+    /// Changes toggle shows instantly instead of loading on click.
+    @AppStorage("prepareChangesAfterScan") var prepareChangesAfterScan = true
+    /// Start the duplicate content scan as soon as a scan finishes. Off by
+    /// default: hashing reads file contents, which costs real I/O and energy.
+    @AppStorage("autoScanDuplicates") var autoScanDuplicates = false
     @AppStorage("hasSeenWelcome") var hasSeenWelcome = false
 
     /// Backing store defaults to UserDefaults.standard; tests pass their
@@ -93,6 +99,10 @@ final class AppPreferences: ObservableObject {
         _autoRescanPolicyRaw = AppStorage(
             wrappedValue: AutoRescanPolicy.smart.rawValue, "autoRescanPolicy", store: defaults
         )
+        _prepareChangesAfterScan = AppStorage(
+            wrappedValue: true, "prepareChangesAfterScan", store: defaults
+        )
+        _autoScanDuplicates = AppStorage(wrappedValue: false, "autoScanDuplicates", store: defaults)
         _hasSeenWelcome = AppStorage(wrappedValue: false, "hasSeenWelcome", store: defaults)
     }
 
@@ -138,5 +148,7 @@ final class AppPreferences: ObservableObject {
         useScanExclusions = false
         exclusionPatternsText = ScanExclusionMatcher.commonPresetPatterns.joined(separator: "\n")
         autoRescanPolicyRaw = AutoRescanPolicy.smart.rawValue
+        prepareChangesAfterScan = true
+        autoScanDuplicates = false
     }
 }
