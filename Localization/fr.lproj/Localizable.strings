@@ -66,7 +66,9 @@
 "Mounted volume scans always include hidden files automatically." = "Les analyses de volumes montés incluent toujours automatiquement les fichiers cachés.";
 "Automatically summarize folders with many small files" = "Résumer automatiquement les dossiers contenant de nombreux petits fichiers";
 "Scan cloud storage folders" = "Analyser les dossiers de stockage cloud";
-"Summarizing folders with thousands of tiny files (like node_modules or caches) dramatically improves scan speed. When cloud scanning is off, ~/Library/CloudStorage (Google Drive, Dropbox, OneDrive) and iCloud Drive are skipped. Changes apply to the next scan." = "Résumer les dossiers contenant des milliers de petits fichiers (comme node_modules ou des caches) améliore considérablement la vitesse d'analyse. Lorsque l'analyse du cloud est désactivée, ~/Library/CloudStorage (Google Drive, Dropbox, OneDrive) et iCloud Drive sont ignorés. Les changements s'appliquent à la prochaine analyse.";
+"Summarizing folders with thousands of tiny files (like node_modules or caches) dramatically improves scan speed." = "Résumer les dossiers contenant des milliers de petits fichiers (comme node_modules ou des caches) améliore considérablement la vitesse d'analyse.";
+"When cloud scanning is off, ~/Library/CloudStorage (Google Drive, Dropbox, OneDrive) and iCloud Drive are skipped." = "Lorsque l'analyse du cloud est désactivée, ~/Library/CloudStorage (Google Drive, Dropbox, OneDrive) et iCloud Drive sont ignorés.";
+"Changes apply to the next scan." = "Les changements s'appliquent à la prochaine analyse.";
 "When opening a scanned location" = "À l'ouverture d'un emplacement analysé";
 "Rescan automatically always refreshes behind the saved results; Smart skips the refresh when the last scan took a while; Show snapshot only always waits for Rescan Now." = "« Réanalyser automatiquement » actualise toujours en arrière-plan derrière les résultats enregistrés ; « Intelligent » ignore l'actualisation quand la dernière analyse a pris du temps ; « Afficher seulement l'instantané » attend toujours un clic sur Réanalyser maintenant.";
 "After a Scan" = "Après une analyse";
