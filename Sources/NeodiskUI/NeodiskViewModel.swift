@@ -60,6 +60,11 @@ final class NeodiskViewModel {
     /// Modification-age buckets and drill-in file list; see AgeStatsModel.
     let ages: AgeStatsModel
 
+    // MARK: Duplicates
+
+    /// On-demand duplicate-content scan and results; see DuplicatesModel.
+    let duplicates: DuplicatesModel
+
     // MARK: Entire-scan search
 
     /// Outline "search entire scan" feature state; see SearchModel.
@@ -160,6 +165,7 @@ final class NeodiskViewModel {
         self.search = SearchModel(coordinator: coordinator, indexService: searchIndexService)
         self.kinds = KindStatsModel(coordinator: coordinator, indexService: searchIndexService)
         self.ages = AgeStatsModel(coordinator: coordinator, indexService: searchIndexService)
+        self.duplicates = DuplicatesModel(coordinator: coordinator)
         self.diff = DiffModel(coordinator: coordinator, snapshotCache: snapshotCache)
         pinnedFolders = pinnedFolderStore.load()
         diff.model = self
@@ -230,6 +236,8 @@ final class NeodiskViewModel {
             return kinds.highlightedKindID.map { .kind($0) }
         case .age:
             return ages.highlightedBucket.map { .ageBucket($0) }
+        case .duplicates:
+            return duplicates.highlightedNodeIDs.map { .nodes($0) }
         }
     }
 
@@ -618,6 +626,7 @@ final class NeodiskViewModel {
         searchIndexService.invalidate()
         kinds.snapshotDidChange(snapshot)
         ages.snapshotDidChange(snapshot)
+        duplicates.snapshotDidChange()
         search.snapshotDidChange()
 
         guard let snapshot else { return }

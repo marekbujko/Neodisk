@@ -157,6 +157,22 @@
 "Show every file modified in this period" = "Mostra tutti i file modificati in questo periodo";
 "Back to age groups" = "Torna ai periodi";
 
+/* MARK: - Duplicates tab */
+"Duplicates" = "Duplicati";
+"Find files with identical content" = "Trova i file con contenuto identico";
+"Compares files larger than %@ and groups identical copies." = "Confronta i file più grandi di %@ e raggruppa le copie identiche.";
+"Find Duplicates" = "Trova duplicati";
+"Searching for duplicates…" = "Ricerca dei duplicati…";
+"Cancel" = "Annulla";
+"%@ groups · %@ wasted" = "%@ gruppi · %@ sprecati";
+"Search for duplicates again" = "Cerca di nuovo i duplicati";
+"No duplicates found" = "Nessun duplicato trovato";
+"Show the copies in this group" = "Mostra le copie di questo gruppo";
+"%@ copies × %@" = "%@ copie × %@";
+"%@ wasted" = "%@ sprecati";
+"Back to duplicates" = "Torna ai duplicati";
+"%@ files couldn't be read" = "%@ file non hanno potuto essere letti";
+
 /* MARK: - File kind category names */
 "Videos" = "Video";
 "Images" = "Immagini";

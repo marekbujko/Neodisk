@@ -14,6 +14,7 @@ import NeodiskKit
 enum AnalysisTab: String, CaseIterable, Identifiable, Sendable {
     case kinds
     case age
+    case duplicates
 
     var id: String { rawValue }
 
@@ -21,6 +22,7 @@ enum AnalysisTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .kinds: return "Kinds"
         case .age: return "Age"
+        case .duplicates: return "Duplicates"
         }
     }
 }
@@ -49,6 +51,8 @@ struct AnalysisPane: View {
                 KindStatsPane(model: model)
             case .age:
                 AgeStatsPane(model: model)
+            case .duplicates:
+                DuplicatesPane(model: model)
             }
         }
     }

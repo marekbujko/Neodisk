@@ -157,6 +157,22 @@
 "Show every file modified in this period" = "この期間に変更されたすべてのファイルを表示";
 "Back to age groups" = "期間の一覧に戻る";
 
+/* MARK: - Duplicates tab */
+"Duplicates" = "重複";
+"Find files with identical content" = "内容が同一のファイルを見つける";
+"Compares files larger than %@ and groups identical copies." = "%@ を超えるファイルの内容を比較し、同一のコピーをグループ化します。";
+"Find Duplicates" = "重複を検索";
+"Searching for duplicates…" = "重複を検索中…";
+"Cancel" = "キャンセル";
+"%@ groups · %@ wasted" = "%@ グループ · %@ の無駄";
+"Search for duplicates again" = "重複を再検索";
+"No duplicates found" = "重複は見つかりませんでした";
+"Show the copies in this group" = "このグループのコピーを表示";
+"%@ copies × %@" = "%@ 個のコピー × %@";
+"%@ wasted" = "%@ の無駄";
+"Back to duplicates" = "重複の一覧に戻る";
+"%@ files couldn't be read" = "%@ 個のファイルを読み込めませんでした";
+
 /* MARK: - File kind category names */
 "Videos" = "動画";
 "Images" = "画像";
