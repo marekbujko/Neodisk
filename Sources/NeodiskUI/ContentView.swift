@@ -309,8 +309,10 @@ private struct ScanFailedView: View {
 private struct WorkspaceView: View {
     let model: NeodiskViewModel
 
-    @AppStorage("outlinePaneWidth") private var outlinePaneWidth = 380.0
-    @AppStorage("kindStatsPaneWidth") private var kindStatsPaneWidth = 250.0
+    // Defaults leave the treemap clearly dominant on a fresh install's
+    // default-size window; both panes stay user-resizable (persisted).
+    @AppStorage("outlinePaneWidth") private var outlinePaneWidth = 300.0
+    @AppStorage("kindStatsPaneWidth") private var kindStatsPaneWidth = 230.0
 
     private var permissionDeniedCount: Int {
         guard let snapshot = model.coordinator.snapshot, snapshot.isComplete else { return 0 }
