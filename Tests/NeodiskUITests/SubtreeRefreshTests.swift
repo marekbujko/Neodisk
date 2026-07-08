@@ -144,6 +144,7 @@ import NeodiskKit
         let cache: ScanSnapshotCache
         let scanService: ControlledSubtreeScanService
         let pinnedFolderStore: PinnedFolderStore
+        private let defaults: UserDefaults
         private let defaultsSuiteName: String
 
         init() throws {
@@ -152,7 +153,7 @@ import NeodiskKit
             cache = ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false)
             scanService = ControlledSubtreeScanService()
             defaultsSuiteName = "NeodiskSubtreeTests-\(UUID().uuidString)"
-            let defaults = try #require(UserDefaults(suiteName: defaultsSuiteName))
+            defaults = try #require(UserDefaults(suiteName: defaultsSuiteName))
             pinnedFolderStore = PinnedFolderStore(defaults: defaults)
         }
 
@@ -170,7 +171,7 @@ import NeodiskKit
 
         func tearDown() {
             try? FileManager.default.removeItem(at: cacheDirectory)
-            UserDefaults().removePersistentDomain(forName: defaultsSuiteName)
+            removeTestDefaultsSuite(defaults, named: defaultsSuiteName)
         }
     }
 

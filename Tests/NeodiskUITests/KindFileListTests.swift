@@ -11,8 +11,8 @@ import NeodiskKit
             .appending(path: "KindFileListTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: cacheDirectory) }
         let defaultsSuiteName = "KindFileListTests-\(UUID().uuidString)"
-        defer { UserDefaults().removePersistentDomain(forName: defaultsSuiteName) }
         let defaults = try #require(UserDefaults(suiteName: defaultsSuiteName))
+        defer { removeTestDefaultsSuite(defaults, named: defaultsSuiteName) }
         let model = NeodiskViewModel(
             snapshotCache: ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false),
             pinnedFolderStore: PinnedFolderStore(defaults: defaults)
@@ -71,8 +71,8 @@ import NeodiskKit
             .appending(path: "OutlineSearchTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: cacheDirectory) }
         let defaultsSuiteName = "OutlineSearchTests-\(UUID().uuidString)"
-        defer { UserDefaults().removePersistentDomain(forName: defaultsSuiteName) }
         let defaults = try #require(UserDefaults(suiteName: defaultsSuiteName))
+        defer { removeTestDefaultsSuite(defaults, named: defaultsSuiteName) }
         let model = NeodiskViewModel(
             snapshotCache: ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false),
             pinnedFolderStore: PinnedFolderStore(defaults: defaults)

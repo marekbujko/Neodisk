@@ -273,7 +273,7 @@ import NeodiskKit
 
         func tearDown() {
             try? FileManager.default.removeItem(at: cacheDirectory)
-            UserDefaults().removePersistentDomain(forName: defaultsSuiteName)
+            removeTestDefaultsSuite(defaults, named: defaultsSuiteName)
         }
     }
 
