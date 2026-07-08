@@ -134,15 +134,9 @@ struct StatsFileListView: View {
                     if let node = model.store?.node(id: nodeID) {
                         FileResultRow(node: node)
                             .listRowSeparator(.hidden)
-                            .contextMenu {
-                                if node.supportsFileActions {
-                                    Button("Reveal in Finder") { model.reveal(node) }
-                                    Button("Open") { model.open(node) }
-                                    Button("Copy Path") { model.copyPath(node) }
-                                }
-                            }
                     }
                 }
+                .fileNodeActions(model: model)
                 .environment(\.defaultMinListRowHeight, 20)
                 .quickLookOnSpace(model: model)
 

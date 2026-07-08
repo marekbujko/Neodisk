@@ -73,21 +73,8 @@ struct OutlinePane: View {
                 OutlineRowView(model: model, row: row)
                     .id(row.id)
                     .listRowSeparator(.hidden)
-                    .contextMenu {
-                        if row.node.supportsFileActions {
-                            Button("Reveal in Finder") { model.reveal(row.node) }
-                            Button("Open") { model.open(row.node) }
-                            Button("Copy Path") { model.copyPath(row.node) }
-                            if row.node.isAutoSummarized {
-                                Divider()
-                                Button("Expand Contents") {
-                                    model.expandSummarizedNode(row.node)
-                                }
-                                .disabled(!model.canRefreshSubtree)
-                            }
-                        }
-                    }
             }
+            .fileNodeActions(model: model, includeExpandContents: true)
             .environment(\.defaultMinListRowHeight, 20)
             .quickLookOnSpace(model: model)
             .onChange(of: model.selectedNodeID) { _, newValue in
@@ -128,15 +115,9 @@ private struct OutlineSearchResultsList: View {
                 if let node = model.store?.node(id: nodeID) {
                     FileResultRow(node: node)
                         .listRowSeparator(.hidden)
-                        .contextMenu {
-                            if node.supportsFileActions {
-                                Button("Reveal in Finder") { model.reveal(node) }
-                                Button("Open") { model.open(node) }
-                                Button("Copy Path") { model.copyPath(node) }
-                            }
-                        }
                 }
             }
+            .fileNodeActions(model: model)
             .environment(\.defaultMinListRowHeight, 20)
             .quickLookOnSpace(model: model)
 
