@@ -40,7 +40,9 @@ Delete and clean up safely in Finder instead.
 ## Features
 
 - Treemap: Pinch to zoom, scroll to pan.
-- Outline + file type statistics: size-sorted file tree and per-type totals
+- Outline + file type statistics: size-sorted file tree and per-type totals.
+- Age heatmap: color the treemap by last-modified date.
+- Duplicate finder: content-hash verified duplicates.
 - Fast scanning: parallel traversal that backs off as the machine
   heat-soaks, hard-link dedup, live progress, glob exclusions.
 - Search: `⌘F` fuzzy search over the entire scan. Quick Look on spacebar.
