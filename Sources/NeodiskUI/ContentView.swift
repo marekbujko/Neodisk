@@ -43,6 +43,21 @@ public struct ContentView: View {
                model.coordinator.phase == .idle {
                 model.startScan(ScanTarget(url: URL(filePath: path, directoryHint: .isDirectory)))
             }
+            // Dev/testing hook: NEODISK_AUTOREVEAL=<path> selects that node
+            // once it is scanned, expanding its ancestors in the outline —
+            // lets headless snapshots exercise deep trees and the
+            // external-selection reveal path.
+            if let revealPath = ProcessInfo.processInfo.environment["NEODISK_AUTOREVEAL"] {
+                Task { @MainActor in
+                    for _ in 0..<60 {
+                        try? await Task.sleep(for: .milliseconds(500))
+                        if let node = Self.findNode(at: revealPath, in: model) {
+                            model.select(node.id)
+                            break
+                        }
+                    }
+                }
+            }
         }
         .toolbar { toolbarContent }
         .navigationTitle(windowTitle)
@@ -80,6 +95,21 @@ public struct ContentView: View {
         case .failed:
             ScanFailedView(model: model)
         }
+    }
+
+    /// Walks the scanned tree down to the node whose path matches, for the
+    /// NEODISK_AUTOREVEAL dev hook.
+    private static func findNode(at path: String, in model: NeodiskViewModel) -> FileNodeRecord? {
+        guard let store = model.store else { return nil }
+        var node = store.root
+        while node.path != path {
+            guard let child = store.children(of: node.id)
+                .first(where: { path.hasPrefix($0.path + "/") || path == $0.path }) else {
+                return nil
+            }
+            node = child
+        }
+        return node
     }
 
     private var windowTitle: String {

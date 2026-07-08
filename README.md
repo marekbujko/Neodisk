@@ -78,9 +78,6 @@ Localization/     # .lproj string catalogs, one per language
 ## Planned
 
 - Add to Homebrew
-- Horizontal scroll in the file outline (undecided). The idea is that
-  deep nesting crops names until the sidebar is expanded very wide, but
-  the current behavior is fine. This should not interfere with search (same pane)
 - Multiplatform: native Windows and Linux versions (a lot of work, will
   take a while)
 
