@@ -18,7 +18,7 @@ Swift/SwiftUI practices and keep the scanning core UI-free.
   - `feat: remember last opened scan location`
   - `perf: parallelize cushion rasterization over cells`
   - `refactor: narrow NeodiskKit public API`
-- Bump `AppVersion.string` (`Sources/NeodiskUI/AppVersion.swift`) on every
+- Bump `AppVersion.string` (`Sources/NeodiskUI/App/AppVersion.swift`) on every
   user-visible change; it shows in the sidebar and identifies the build.
 
 ## Environment Facts
@@ -47,7 +47,17 @@ Swift/SwiftUI practices and keep the scanning core UI-free.
 ```
 Sources/
 ├── Neodisk/         # Thin executable shim → NeodiskApp.main()
-├── NeodiskUI/       # The SwiftUI app: state, coordination, treemap views
+├── NeodiskUI/       # The SwiftUI app, one folder per concern:
+│   ├── App/         #   app entry, root ContentView, settings, preferences
+│   ├── Model/       #   NeodiskViewModel, ScanCoordinator, diff state
+│   ├── Treemap/     #   treemap pane, scene, controller, breadcrumb
+│   ├── Sunburst/    #   sunburst pane, chart, geometry, legend
+│   ├── Outline/     #   file outline, locations sidebar, warnings panel
+│   ├── Statistics/  #   kinds/age/largest/duplicates tabs + models
+│   ├── Search/      #   search index, fuzzy matcher, outline search
+│   ├── System/      #   Finder/Quick Look glue, pinned folders
+│   ├── Shared/      #   palettes, formatters
+│   └── Dev/         #   headless render + snapshot dev hooks
 ├── NeodiskKit/      # UI-free scan engine and core data model
 │   ├── Models/      #   scan targets, node records, tree store, snapshots
 │   └── Services/    #   ScanEngine, snapshot cache, formatters, dedup
@@ -124,8 +134,8 @@ copies them into `Contents/Resources/` and `Info.plist` lists the languages.
 - Scanner or data bug: `Sources/NeodiskKit/Services/ScanEngine.swift` and the
   matching tests in `Tests/`.
 - Tree/index behavior bug: `Sources/NeodiskKit/Models/FileTreeStore.swift`.
-- Selection/navigation/UI state bug: `Sources/NeodiskUI/NeodiskViewModel.swift`
-  and `Sources/NeodiskUI/ScanCoordinator.swift`.
+- Selection/navigation/UI state bug: `Sources/NeodiskUI/Model/NeodiskViewModel.swift`
+  and `Sources/NeodiskUI/Model/ScanCoordinator.swift`.
 - Size or display formatting bug: `Sources/NeodiskKit/Services/FileSizeFormatter.swift`.
 - Treemap layout or rendering bug: `Sources/TreemapKit/CushionTreemapRenderer.swift`
-  and `Sources/NeodiskUI/TreemapScene.swift`.
+  and `Sources/NeodiskUI/Treemap/TreemapScene.swift`.
