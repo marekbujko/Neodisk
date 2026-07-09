@@ -54,6 +54,9 @@ final class NeodiskViewModel {
     /// Locations sidebar visibility; lives here so the View menu can toggle
     /// it. Always starts visible.
     var sidebarVisibility = NavigationSplitViewVisibility.all
+    /// Which visualization the center pane shows (treemap or sunburst).
+    /// Preference mirroring happens where the toolbar switcher binds.
+    var vizViewMode: VizViewMode = .treemap
 
     // MARK: Kind statistics
 
@@ -273,8 +276,17 @@ final class NeodiskViewModel {
     }
 
     /// The swatch color a node renders with on the map right now — the
-    /// status bar's swatch must agree with the active color mode.
+    /// status bar's swatch must agree with the active view and color mode.
+    /// On the sunburst's Largest tab that is the Radix branch hue; every
+    /// other combination keeps the treemap's kind/age semantics.
     func displayColor(for node: FileNodeRecord) -> Color {
+        if vizViewMode == .sunburst, analysisTab == .largest, let store {
+            return SunburstColorResolver.branchColor(
+                forNodeID: node.id,
+                in: store,
+                effectiveRootID: effectiveRootID ?? store.root.id
+            )
+        }
         if case .age(let referenceDate) = treemapColorMode {
             guard FileKindClassifier.isKindCountable(node) else {
                 let rgb = FileKindCatalog.directoryRGB
@@ -530,9 +542,20 @@ final class NeodiskViewModel {
             .sink { [weak self] _ in
                 self?.updateFreeSpace()
                 self?.syncVizPalette()
+                self?.syncVizViewMode()
             }
         updateFreeSpace()
         syncVizPalette()
+        syncVizViewMode()
+    }
+
+    /// Mirror the persisted view-mode preference onto the model so the
+    /// workspace and status bar follow the toolbar switcher.
+    private func syncVizViewMode() {
+        guard let preferences else { return }
+        if vizViewMode != preferences.vizViewMode {
+            vizViewMode = preferences.vizViewMode
+        }
     }
 
     /// Push the palette to the kind catalog when the colorblind toggle flips.
