@@ -27,6 +27,8 @@ struct SunburstPane: View {
     /// segment; nil shows the chart root. Driven ONLY by chart hover — list
     /// row hover must never move the preview (no flicker).
     @State private var previewFolderID: String?
+    /// Pending debounced clear of the preview — see `setPreviewFolder`.
+    @State private var pendingPreviewClear: Task<Void, Never>?
 
     var body: some View {
         if let store = model.store,
@@ -74,13 +76,13 @@ struct SunburstPane: View {
             }
             // A new root (drill, breadcrumb, rescan) invalidates the preview.
             .onChange(of: model.effectiveRootID) { _, _ in
-                setPreviewFolder(nil)
+                resetPreviewFolder()
             }
             // Switching back to the treemap must not leave the status bar
             // holding the last-hovered sunburst item.
             .onDisappear {
                 clearHover()
-                setPreviewFolder(nil)
+                resetPreviewFolder()
             }
         } else {
             Color.clear
@@ -239,12 +241,35 @@ struct SunburstPane: View {
 
     /// Every preview change funnels through here so the legend's identity
     /// swap happens inside an animated transaction and cross-fades (see the
-    /// `.transition(.opacity)` in SunburstLegendList).
+    /// `.transition(.opacity)` in SunburstLegendList). Clearing is debounced:
+    /// sliding from a folder's arc to its subfolder's crosses the ring gap,
+    /// which drops the hover for an instant — clearing after a beat lets that
+    /// hop fade folder→subfolder directly instead of flashing the root list.
     private func setPreviewFolder(_ id: String?) {
+        pendingPreviewClear?.cancel()
+        pendingPreviewClear = nil
         guard previewFolderID != id else { return }
+        guard let id else {
+            pendingPreviewClear = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(140))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    previewFolderID = nil
+                }
+            }
+            return
+        }
         withAnimation(.easeInOut(duration: 0.18)) {
             previewFolderID = id
         }
+    }
+
+    /// Immediate, unanimated preview teardown for lifecycle changes (new
+    /// root, view disappearing) where a debounced fade would be stale.
+    private func resetPreviewFolder() {
+        pendingPreviewClear?.cancel()
+        pendingPreviewClear = nil
+        previewFolderID = nil
     }
 
     private func clearHover() {
