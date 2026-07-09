@@ -278,6 +278,19 @@ struct SunburstPane: View {
         model.hoveredCellIsFreeSpace = false
     }
 
+    /// Sunburst drills are pure navigation (DaisyDisk-style): a successful
+    /// drill clears the selection so the breadcrumb tracks the drill root —
+    /// keeping a stale selection (drillIn preserves one inside the new root,
+    /// which suits the treemap's outline) reads as "that file is still
+    /// selected" here. Refusals degrade to selecting the node.
+    private func drillOrSelect(_ nodeID: String) {
+        if model.drillIn(to: nodeID) {
+            model.select(nil)
+        } else {
+            model.select(nodeID)
+        }
+    }
+
     private func handleClick(_ segment: SunburstSegment?) {
         guard let segment else {
             model.select(nil)
@@ -294,20 +307,16 @@ struct SunburstPane: View {
             // more angle to spread out; when it is already the root (or
             // refuses), fall back to selecting the folder.
             guard let folderID = segment.parentFolderID else { return }
-            if !model.drillIn(to: folderID) {
-                model.select(folderID)
-            }
+            drillOrSelect(folderID)
             return
         }
 
         guard let nodeID = segment.nodeID else { return }
         if model.store?.node(id: nodeID)?.isDirectory == true {
             // A single click on a folder segment drills in. drillIn guards
-            // summarized/childless folders and manages the selection;
-            // refusals degrade to a plain select.
-            if !model.drillIn(to: nodeID) {
-                model.select(nodeID)
-            }
+            // summarized/childless folders; refusals degrade to a plain
+            // select.
+            drillOrSelect(nodeID)
         } else {
             // A single click on a file selects it and opens Quick Look
             // (selection changes then live-update the open panel).
@@ -359,9 +368,7 @@ struct SunburstPane: View {
             if isDirectory {
                 // Same as clicking the folder's segment: drill in, degrade
                 // to select when drillIn refuses.
-                if !model.drillIn(to: nodeID) {
-                    model.select(nodeID)
-                }
+                drillOrSelect(nodeID)
             } else {
                 model.select(nodeID)
                 if let node = model.store?.node(id: nodeID) {
