@@ -167,6 +167,16 @@ struct SunburstPane: View {
         }
 
         let paletteKey = style.palette == .colorblind ? "cb" : "std"
+        // Branch coloring never reads the kind catalog, so its rebuilds must
+        // not force a re-layout: on restore the catalog goes empty → built,
+        // and folding its buildID in here made every restore lay the chart
+        // out twice for byte-identical segments.
+        let catalogKey: String
+        if case .branch = style.mode {
+            catalogKey = "-"
+        } else {
+            catalogKey = style.catalog.buildID.uuidString
+        }
         return [
             snapshotID.uuidString,
             rootID,
@@ -174,7 +184,7 @@ struct SunburstPane: View {
             modeKey,
             highlightKey,
             paletteKey,
-            style.catalog.buildID.uuidString,
+            catalogKey,
             "\(freeSpaceBytes ?? 0)"
         ].joined(separator: "|")
     }

@@ -374,8 +374,12 @@ final class TreemapController {
         let palette = inputs.palette
         let scale = view?.window?.backingScaleFactor ?? 2
         renderTask = Task { [weak self] in
-            let result = await Task.detached(priority: .userInitiated) {
-                () -> (TreemapScene, CGImage?) in
+            // The detached task doesn't inherit cancellation, so a superseded
+            // render (partial bursts, catalog landing mid-render) used to run
+            // its full rasterization anyway and steal cores from the render
+            // that replaces it. Forward the cancel and bail before rastering.
+            let work = Task.detached(priority: .userInitiated) {
+                () -> (TreemapScene, CGImage?)? in
                 let scene = TreemapScene.build(
                     store: store, rootID: rootID, size: size, catalog: catalog,
                     colorMode: colorMode,
@@ -385,11 +389,17 @@ final class TreemapController {
                     freeSpaceBytes: freeSpaceBytes,
                     palette: palette
                 )
+                guard !Task.isCancelled else { return nil }
                 let image = CushionTreemapRenderer.render(cells: scene.cells, bounds: scene.renderBounds, scale: scale)
                 return (scene, image)
-            }.value
+            }
+            let result = await withTaskCancellationHandler {
+                await work.value
+            } onCancel: {
+                work.cancel()
+            }
 
-            guard let self, !Task.isCancelled else { return }
+            guard let self, !Task.isCancelled, let result else { return }
             self.renderTask = nil
             self.scene = result.0
             self.image = result.1
