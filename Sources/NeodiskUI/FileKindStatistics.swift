@@ -218,13 +218,10 @@ struct FileKindCatalog: Sendable {
             guard FileKindClassifier.isKindCountable(node) else { continue }
             let categoryID = FileKindClassifier.kindID(for: node, mode: .categories)
             let typeID = FileKindClassifier.kindID(for: node, mode: .types)
-            let existingCategory = categorySizes[categoryID] ?? (0, 0)
-            categorySizes[categoryID] = (
-                existingCategory.size + node.allocatedSize,
-                existingCategory.count + 1
-            )
-            let existingType = typeSizes[typeID] ?? (0, 0)
-            typeSizes[typeID] = (existingType.size + node.allocatedSize, existingType.count + 1)
+            categorySizes[categoryID, default: (0, 0)].size += node.allocatedSize
+            categorySizes[categoryID, default: (0, 0)].count += 1
+            typeSizes[typeID, default: (0, 0)].size += node.allocatedSize
+            typeSizes[typeID, default: (0, 0)].count += 1
         }
 
         func persisted(_ sizes: [String: (size: Int64, count: Int)]) -> [PersistedKindStat] {

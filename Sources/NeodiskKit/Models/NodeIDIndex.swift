@@ -13,6 +13,22 @@
 import Dispatch
 import Foundation
 
+/// FNV-1a over a string's UTF-8 — the shared cheap hash for node-ID paths
+/// (this index's shard keys, ScanSizeBaseline's size map).
+nonisolated enum FNV1a {
+    static func hash(_ string: String) -> UInt64 {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        var string = string
+        string.withUTF8 { bytes in
+            for byte in bytes {
+                hash ^= UInt64(byte)
+                hash &*= 0x0000_0100_0000_01b3
+            }
+        }
+        return hash
+    }
+}
+
 nonisolated struct NodeIDIndex: Sendable {
     /// Node ID plus its FNV-1a hash; equality still compares the string, so
     /// FNV collisions cost a memcmp, never a wrong answer.
@@ -41,33 +57,17 @@ nonisolated struct NodeIDIndex: Sendable {
         }
     }
 
-    private static func fnv1a(_ id: String) -> UInt64 {
-        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        var id = id
-        id.withUTF8 { bytes in
-            for byte in bytes {
-                hash ^= UInt64(byte)
-                hash &*= 0x0000_0100_0000_01b3
-            }
-        }
-        return hash
-    }
-
     private static func shardIndex(for hash: UInt64) -> Int {
         Int(hash & UInt64(shardCount - 1))
     }
 
-    var count: Int {
-        shards.reduce(0) { $0 + $1.count }
-    }
-
     subscript(id: String) -> Int32? {
         get {
-            let hash = Self.fnv1a(id)
+            let hash = FNV1a.hash(id)
             return shards[Self.shardIndex(for: hash)][HashedKey(hash: hash, id: id)]
         }
         set {
-            let hash = Self.fnv1a(id)
+            let hash = FNV1a.hash(id)
             shards[Self.shardIndex(for: hash)][HashedKey(hash: hash, id: id)] = newValue
         }
     }
@@ -76,7 +76,7 @@ nonisolated struct NodeIDIndex: Sendable {
     /// or nil when the key was newly inserted.
     @discardableResult
     mutating func updateValue(_ value: Int32, forKey id: String) -> Int32? {
-        let hash = Self.fnv1a(id)
+        let hash = FNV1a.hash(id)
         return shards[Self.shardIndex(for: hash)]
             .updateValue(value, forKey: HashedKey(hash: hash, id: id))
     }
@@ -99,7 +99,7 @@ nonisolated struct NodeIDIndex: Sendable {
                 let start = min(chunk * chunkSize, nodeCount)
                 let end = min(start + chunkSize, nodeCount)
                 for i in start..<end {
-                    hashesOut[i] = fnv1a(nodesIn[i].id)
+                    hashesOut[i] = FNV1a.hash(nodesIn[i].id)
                 }
             }
         }

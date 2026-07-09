@@ -43,11 +43,6 @@ public struct ScanSizeBaseline: Sendable {
     }
 
     private static func hashedID(_ id: String) -> UInt64 {
-        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        for byte in id.utf8 {
-            hash ^= UInt64(byte)
-            hash = hash &* 0x0000_0100_0000_01b3
-        }
-        return hash
+        FNV1a.hash(id)
     }
 }
