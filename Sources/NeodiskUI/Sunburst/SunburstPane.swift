@@ -20,6 +20,14 @@ struct SunburstPane: View {
 
     let model: NeodiskViewModel
 
+    /// Shared between the chart and the legend list so both derive from the
+    /// same rendered layout (segment fills, aggregate pooling, free space).
+    @StateObject private var chartModel = SunburstChartModel()
+    /// The folder the legend previews while the chart hovers a directory
+    /// segment; nil shows the chart root. Driven ONLY by chart hover — list
+    /// row hover must never move the preview (no flicker).
+    @State private var previewFolderID: String?
+
     var body: some View {
         if let store = model.store,
            let snapshot = model.coordinator.snapshot,
@@ -27,33 +35,64 @@ struct SunburstPane: View {
            let rootNode = store.node(id: rootID) {
             let style = colorStyle
             let freeSpaceBytes = gatedFreeSpaceBytes
-            SunburstChartView(
-                rootNode: rootNode,
-                parentNode: store.parent(of: rootID),
-                treeStore: store,
-                selectedNodeID: model.selectedNodeID,
-                selectedAncestorIDs: selectedAncestorIDs(in: store),
-                depthLimit: Self.depthLimit,
-                layoutID: Self.layoutID(
-                    snapshotID: snapshot.id,
-                    rootID: rootID,
+            let displayedFolder = displayedFolder(rootNode: rootNode, in: store)
+            HStack(spacing: 0) {
+                SunburstChartView(
+                    rootNode: rootNode,
+                    parentNode: store.parent(of: rootID),
+                    treeStore: store,
+                    selectedNodeID: model.selectedNodeID,
+                    selectedAncestorIDs: selectedAncestorIDs(in: store),
+                    depthLimit: Self.depthLimit,
+                    layoutID: Self.layoutID(
+                        snapshotID: snapshot.id,
+                        rootID: rootID,
+                        style: style,
+                        freeSpaceBytes: freeSpaceBytes
+                    ),
+                    viewportResetID: "\(snapshot.id)|\(rootID)",
                     style: style,
-                    freeSpaceBytes: freeSpaceBytes
-                ),
-                viewportResetID: "\(snapshot.id)|\(rootID)",
-                style: style,
-                freeSpaceBytes: freeSpaceBytes,
-                onHoverSegment: { handleHover($0) },
-                onClickSegment: { handleClick($0) },
-                onNavigateToParent: { model.zoomOut() },
-                contextMenu: { contextMenu(for: $0) }
-            )
+                    freeSpaceBytes: freeSpaceBytes,
+                    centerSizeText: NeodiskFormatters.size(displayedFolder.allocatedSize),
+                    onHoverSegment: { handleHover($0) },
+                    onClickSegment: { handleClick($0) },
+                    onNavigateToParent: { model.zoomOut() },
+                    contextMenu: { contextMenu(for: $0) },
+                    chartModel: chartModel
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                SunburstLegendList(
+                    model: model,
+                    chartModel: chartModel,
+                    displayedFolder: displayedFolder,
+                    chartRootID: rootID,
+                    style: style,
+                    onHoverRow: { handleRowHover($0) },
+                    onClickRow: { handleRowClick($0) }
+                )
+            }
+            // A new root (drill, breadcrumb, rescan) invalidates the preview.
+            .onChange(of: model.effectiveRootID) { _, _ in
+                previewFolderID = nil
+            }
             // Switching back to the treemap must not leave the status bar
             // holding the last-hovered sunburst item.
-            .onDisappear { clearHover() }
+            .onDisappear {
+                clearHover()
+                previewFolderID = nil
+            }
         } else {
             Color.clear
         }
+    }
+
+    /// The folder the legend and center hole describe: the hover-preview
+    /// folder while the chart hovers a directory, otherwise the chart root.
+    private func displayedFolder(rootNode: FileNodeRecord, in store: FileTreeStore) -> FileNodeRecord {
+        guard let previewFolderID,
+              let previewFolder = store.node(id: previewFolderID) else { return rootNode }
+        return previewFolder
     }
 
     // MARK: - Color style
@@ -156,6 +195,7 @@ struct SunburstPane: View {
     private func handleHover(_ segment: SunburstSegment?) {
         guard let segment else {
             clearHover()
+            previewFolderID = nil
             return
         }
 
@@ -163,6 +203,7 @@ struct SunburstPane: View {
             model.hoveredNodeID = nil
             model.hoveredAggregate = nil
             model.hoveredCellIsFreeSpace = true
+            previewFolderID = nil
             return
         }
 
@@ -173,12 +214,24 @@ struct SunburstPane: View {
                 totalSize: segment.totalSize
             )
             model.hoveredCellIsFreeSpace = false
+            previewFolderID = nil
             return
         }
 
         model.hoveredNodeID = segment.nodeID
         model.hoveredAggregate = nil
         model.hoveredCellIsFreeSpace = false
+        // Hovering a directory previews its contents in the legend; files
+        // (and childless folders, which have nothing to list) keep the list
+        // on the current root and highlight their containing row instead.
+        if let nodeID = segment.nodeID,
+           let node = model.store?.node(id: nodeID),
+           node.isDirectory,
+           model.store?.children(of: nodeID).isEmpty == false {
+            previewFolderID = nodeID
+        } else {
+            previewFolderID = nil
+        }
     }
 
     private func clearHover() {
@@ -211,15 +264,86 @@ struct SunburstPane: View {
 
         guard let nodeID = segment.nodeID else { return }
         if model.store?.node(id: nodeID)?.isDirectory == true {
-            // The user's key ask: a single click on a folder segment drills
-            // in. drillIn guards summarized/childless folders and manages
-            // the selection; refusals degrade to a plain select.
+            // A single click on a folder segment drills in. drillIn guards
+            // summarized/childless folders and manages the selection;
+            // refusals degrade to a plain select.
             if !model.drillIn(to: nodeID) {
                 model.select(nodeID)
             }
         } else {
+            // A single click on a file selects it and opens Quick Look
+            // (selection changes then live-update the open panel).
             model.select(nodeID)
+            if let node = model.store?.node(id: nodeID) {
+                QuickLookPresenter.shared.openPreview(for: node)
+            }
         }
+    }
+
+    // MARK: - Legend list interaction
+
+    /// List row hover feeds the chart highlight and the status bar but must
+    /// never move the legend preview (that is chart-hover-only).
+    private func handleRowHover(_ row: SunburstLegendRow?) {
+        guard let row else {
+            clearHover()
+            chartModel.setHoveredSegmentID(nil)
+            return
+        }
+
+        switch row.target {
+        case .node(let nodeID, _):
+            model.hoveredNodeID = nodeID
+            model.hoveredAggregate = nil
+            model.hoveredCellIsFreeSpace = false
+            chartModel.setHoveredSegmentID(chartModel.segment(forNodeID: nodeID)?.id)
+        case .aggregate:
+            // Mirror hovering the aggregate segment itself: the status bar
+            // reads "N smaller items in <displayed folder>".
+            model.hoveredNodeID = displayedFolderID
+            model.hoveredAggregate = TreemapCell.AggregateInfo(
+                itemCount: row.itemCount,
+                totalSize: row.size
+            )
+            model.hoveredCellIsFreeSpace = false
+            chartModel.setHoveredSegmentID(chartModel.segment(forSegmentID: row.id)?.id)
+        case .freeSpace:
+            model.hoveredNodeID = nil
+            model.hoveredAggregate = nil
+            model.hoveredCellIsFreeSpace = true
+            chartModel.setHoveredSegmentID(chartModel.segment(forSegmentID: row.id)?.id)
+        }
+    }
+
+    private func handleRowClick(_ row: SunburstLegendRow) {
+        switch row.target {
+        case .node(let nodeID, let isDirectory):
+            if isDirectory {
+                // Same as clicking the folder's segment: drill in, degrade
+                // to select when drillIn refuses.
+                if !model.drillIn(to: nodeID) {
+                    model.select(nodeID)
+                }
+            } else {
+                model.select(nodeID)
+                if let node = model.store?.node(id: nodeID) {
+                    QuickLookPresenter.shared.openPreview(for: node)
+                }
+            }
+        case .aggregate, .freeSpace:
+            // The aggregate's folder is already displayed and free space is
+            // not navigable — these rows are hover-highlight only.
+            break
+        }
+    }
+
+    /// The folder the legend currently lists — the hover preview or the
+    /// chart root (mirrors `displayedFolder(rootNode:in:)` for handlers).
+    private var displayedFolderID: String? {
+        if let previewFolderID, model.store?.node(id: previewFolderID) != nil {
+            return previewFolderID
+        }
+        return model.effectiveRootID
     }
 
     /// Same actions as the treemap's context menu: Reveal in Finder / Open /

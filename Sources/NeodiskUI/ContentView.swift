@@ -379,10 +379,15 @@ private struct WorkspaceView: View {
         VStack(spacing: 0) {
             ZStack(alignment: .bottomTrailing) {
                 HStack(spacing: 0) {
-                    OutlinePane(model: model)
-                        .frame(width: outlinePaneWidth)
+                    // The sunburst brings its own legend list; the outline
+                    // pane would be a third redundant column, so it is
+                    // treemap-only (the analysis pane behaves as always).
+                    if model.vizViewMode != .sunburst {
+                        OutlinePane(model: model)
+                            .frame(width: outlinePaneWidth)
 
-                    PaneSplitter(width: $outlinePaneWidth, range: 240...600, edge: .leading)
+                        PaneSplitter(width: $outlinePaneWidth, range: 240...600, edge: .leading)
+                    }
 
                     VStack(spacing: 0) {
                         TreemapBreadcrumbBar(model: model)

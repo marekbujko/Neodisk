@@ -32,13 +32,18 @@ struct SunburstChartView: View {
     let viewportResetID: String
     let style: SunburstColorStyle
     let freeSpaceBytes: Int64?
+    /// Formatted total size of the displayed folder, shown in the center
+    /// hole (the hover-preview folder while the chart hovers a directory).
+    let centerSizeText: String
     let onHoverSegment: (SunburstSegment?) -> Void
     let onClickSegment: (SunburstSegment?) -> Void
     let onNavigateToParent: () -> Void
     let contextMenu: (SunburstSegment) -> NSMenu?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @StateObject private var chartModel = SunburstChartModel()
+    /// Owned by SunburstPane, which shares the rendered segments with the
+    /// legend list so both derive from the same layout.
+    @ObservedObject var chartModel: SunburstChartModel
     @State private var isHoveringCenter = false
     @State private var showsLoadingDiskMapProgress = false
     @State private var viewportTransform = SunburstViewportTransform.identity
@@ -136,19 +141,31 @@ struct SunburstChartView: View {
             .position(x: chartFrame.midX, y: chartFrame.midY)
             .allowsHitTesting(false)
 
-            if parentNode != nil,
-               isHoveringCenter,
-               !chartModel.isLayoutPending,
-               !chartModel.renderedSegments.isEmpty {
-                SunburstCenterAffordance()
-                    .equatable()
-                    .frame(
-                        width: centerAffordanceSize(in: chartFrame),
-                        height: centerAffordanceSize(in: chartFrame)
-                    )
-                    .position(x: chartFrame.midX, y: chartFrame.midY)
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
+            if !chartModel.isLayoutPending, !chartModel.renderedSegments.isEmpty {
+                if parentNode != nil, isHoveringCenter {
+                    // The "go up" affordance takes the hole over while the
+                    // cursor is on it; the size text returns on exit.
+                    SunburstCenterAffordance()
+                        .equatable()
+                        .frame(
+                            width: centerAffordanceSize(in: chartFrame),
+                            height: centerAffordanceSize(in: chartFrame)
+                        )
+                        .position(x: chartFrame.midX, y: chartFrame.midY)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                } else {
+                    Text(verbatim: centerSizeText)
+                        .font(.system(size: 14, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.4)
+                        .frame(width: centerAffordanceSize(in: chartFrame) * 0.9)
+                        .position(x: chartFrame.midX, y: chartFrame.midY)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
             }
 
             if chartModel.isLayoutPending {

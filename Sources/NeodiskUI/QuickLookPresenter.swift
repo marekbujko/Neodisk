@@ -51,6 +51,17 @@ final class QuickLookPresenter: NSObject {
         showPanel()
     }
 
+    /// A file was clicked in the sunburst (chart segment or legend row):
+    /// open the panel previewing it, retargeting an already-open panel.
+    /// Unlike the space toggle it never closes the panel, and it stays
+    /// quiet when the node cannot be previewed — a click's primary job
+    /// (selecting) already succeeded.
+    func openPreview(for node: FileNodeRecord) {
+        guard Self.canPreview(node) else { return }
+        previewedURL = node.url as NSURL
+        showPanel()
+    }
+
     /// Selection moved while the panel is up — arrow-keying through the
     /// outline live-updates the preview. No-op when the panel is closed;
     /// keeps the last preview when the new selection is not previewable

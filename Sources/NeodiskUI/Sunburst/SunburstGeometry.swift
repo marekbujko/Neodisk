@@ -362,7 +362,9 @@ enum SunburstLayout {
     /// treemap: kind catalog colors (directories neutral), the age ramp, and
     /// `TreemapScene.dimmedRGB` for segments a highlight doesn't match.
     /// Branch mode returns nil — the resolver colors from the token.
-    private nonisolated static func resolvedFillRGB(
+    /// Internal (not private) so the legend list can resolve the same fill
+    /// for nodes without a rendered segment (children of a max-depth folder).
+    nonisolated static func resolvedFillRGB(
         for node: FileNodeRecord,
         style: SunburstColorStyle
     ) -> SIMD3<Float>? {

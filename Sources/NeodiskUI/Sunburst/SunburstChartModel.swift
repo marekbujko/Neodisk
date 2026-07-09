@@ -83,6 +83,18 @@ final class SunburstChartModel: ObservableObject {
         renderState.segment(at: point, in: size)
     }
 
+    /// The rendered segment for a tree node, if the chart drew one — lets
+    /// the legend list highlight a hovered row's arc.
+    func segment(forNodeID nodeID: String) -> SunburstSegment? {
+        renderState.segment(forNodeID: nodeID)
+    }
+
+    /// The rendered segment with this id (aggregate and free-space segments
+    /// have no node) — legend row hover for pooled/free rows.
+    func segment(forSegmentID segmentID: SunburstSegment.ID) -> SunburstSegment? {
+        renderState.segment(forSegmentID: segmentID)
+    }
+
     func selectionOverlaySegments(
         selectedNodeID: String?,
         selectedAncestorIDs: Set<String>
@@ -269,6 +281,14 @@ private struct SunburstChartRenderState {
 
     func segment(at point: CGPoint, in size: CGSize) -> SunburstSegment? {
         hitTestIndex.segment(at: point, in: size)
+    }
+
+    func segment(forNodeID nodeID: String) -> SunburstSegment? {
+        segmentByNodeID[nodeID]
+    }
+
+    func segment(forSegmentID segmentID: SunburstSegment.ID) -> SunburstSegment? {
+        segmentLookup[segmentID]
     }
 
     func selectionOverlaySegments(
