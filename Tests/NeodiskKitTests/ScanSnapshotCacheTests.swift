@@ -268,6 +268,40 @@ import Testing
         #expect(await cache.totalSizeOnDisk() == 0)
     }
 
+    @Test func testAuxiliaryDataLivesAndDiesWithItsSnapshot() async throws {
+        let cacheDirectory = makeTemporaryCacheDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        let cache = ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false)
+
+        let snapshot = makeRichSnapshot(rootPath: "/cache/aux")
+        let targetID = snapshot.target.id
+        try await cache.save(snapshot)
+
+        #expect(await cache.loadAuxiliaryData(forTargetID: targetID) == nil)
+        let payload = Data("kind-stats".utf8)
+        await cache.saveAuxiliaryData(payload, forTargetID: targetID)
+        #expect(await cache.loadAuxiliaryData(forTargetID: targetID) == payload)
+        #expect(await cache.totalSizeOnDisk() > 0)
+
+        // Pruning keeps auxiliary data whose snapshot survives …
+        _ = await cache.pruneAndIndex(keepingTargetIDs: [targetID])
+        #expect(await cache.loadAuxiliaryData(forTargetID: targetID) == payload)
+
+        // … and drops it with a pruned or removed snapshot.
+        _ = await cache.pruneAndIndex(keepingTargetIDs: [])
+        #expect(await cache.loadAuxiliaryData(forTargetID: targetID) == nil)
+
+        try await cache.save(snapshot)
+        await cache.saveAuxiliaryData(payload, forTargetID: targetID)
+        await cache.removeSnapshot(forTargetID: targetID)
+        #expect(await cache.loadAuxiliaryData(forTargetID: targetID) == nil)
+
+        await cache.saveAuxiliaryData(payload, forTargetID: targetID)
+        await cache.removeAll()
+        #expect(await cache.loadAuxiliaryData(forTargetID: targetID) == nil)
+        #expect(await cache.totalSizeOnDisk() == 0)
+    }
+
     @Test func testResavingReplacesPreviousSnapshotForTarget() async throws {
         let cacheDirectory = makeTemporaryCacheDirectory()
         defer { try? FileManager.default.removeItem(at: cacheDirectory) }

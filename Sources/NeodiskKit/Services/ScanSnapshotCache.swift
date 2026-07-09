@@ -57,6 +57,7 @@ public actor ScanSnapshotCache {
     static let oldestReadableFormatVersion: UInt32 = 1
     private static let magic: UInt32 = 0x4E44_5343 // "NDSC"
     private static let fileExtension = "ndscan"
+    private static let auxiliaryFileExtension = "ndaux"
 
     private let directoryURL: URL
     private let isLoggingEnabled: Bool
@@ -184,6 +185,12 @@ public actor ScanSnapshotCache {
             try? FileManager.default.removeItem(at: url)
         }
 
+        // Auxiliary payloads live and die with their latest snapshot.
+        for url in auxiliaryFileURLs() where !latestBasenames.contains(Self.slotBasename(url)) {
+            log("pruning orphaned auxiliary data \(url.lastPathComponent)")
+            try? FileManager.default.removeItem(at: url)
+        }
+
         var infoByPath: [String: CachedScanInfo] = [:]
         for (path, metadata) in latestMetadataByPath {
             let duration = metadata.finishedAt.map { $0.timeIntervalSince(metadata.startedAt) }
@@ -197,20 +204,36 @@ public actor ScanSnapshotCache {
         return infoByPath
     }
 
+    // MARK: - Auxiliary data
+
+    /// Opaque per-target payload stored alongside the latest snapshot (the
+    /// UI keeps derived data like kind statistics here so restoring a
+    /// snapshot doesn't recompute them). Removed and pruned with the
+    /// snapshot; content and staleness checks are the caller's business.
+    public func saveAuxiliaryData(_ data: Data, forTargetID targetID: String) {
+        try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try? data.write(to: auxiliaryFileURL(forTargetID: targetID), options: .atomic)
+    }
+
+    public func loadAuxiliaryData(forTargetID targetID: String) -> Data? {
+        try? Data(contentsOf: auxiliaryFileURL(forTargetID: targetID))
+    }
+
     public func removeSnapshot(forTargetID targetID: String) {
         try? FileManager.default.removeItem(at: fileURL(forTargetID: targetID))
         try? FileManager.default.removeItem(at: previousFileURL(forTargetID: targetID))
+        try? FileManager.default.removeItem(at: auxiliaryFileURL(forTargetID: targetID))
     }
 
     public func removeAll() {
-        for url in cacheFileURLs() {
+        for url in cacheFileURLs() + auxiliaryFileURLs() {
             try? FileManager.default.removeItem(at: url)
         }
     }
 
     /// Total size of all cache files, for the Settings privacy tab.
     public func totalSizeOnDisk() -> Int64 {
-        cacheFileURLs().reduce(into: Int64(0)) { total, url in
+        (cacheFileURLs() + auxiliaryFileURLs()).reduce(into: Int64(0)) { total, url in
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
             total = total.addingClamped(Int64(size))
         }
@@ -228,6 +251,13 @@ public actor ScanSnapshotCache {
     private func previousFileURL(forTargetID targetID: String) -> URL {
         directoryURL.appending(
             path: "\(Self.hashedName(forTargetID: targetID)).prev.\(Self.fileExtension)",
+            directoryHint: .notDirectory
+        )
+    }
+
+    private func auxiliaryFileURL(forTargetID targetID: String) -> URL {
+        directoryURL.appending(
+            path: "\(Self.hashedName(forTargetID: targetID)).\(Self.auxiliaryFileExtension)",
             directoryHint: .notDirectory
         )
     }
@@ -256,6 +286,14 @@ public actor ScanSnapshotCache {
             includingPropertiesForKeys: [.fileSizeKey]
         )) ?? []
         return contents.filter { $0.pathExtension == Self.fileExtension }
+    }
+
+    private func auxiliaryFileURLs() -> [URL] {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.fileSizeKey]
+        )) ?? []
+        return contents.filter { $0.pathExtension == Self.auxiliaryFileExtension }
     }
 
     private func elapsedDescription(since start: ContinuousClock.Instant) -> String {

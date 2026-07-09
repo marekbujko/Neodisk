@@ -397,6 +397,11 @@ final class NeodiskViewModel {
         resetPerScanState()
         coordinator.beginSnapshotRestore(target)
         Task { [weak self, snapshotCache] in
+            // Kind stats first: the sidecar is tiny next to the snapshot, so
+            // the seed is always in place before the decoded tree lands and
+            // the first render can be colored instead of gray.
+            let sidecarData = await snapshotCache.loadAuxiliaryData(forTargetID: target.id)
+            self?.kinds.prepareSeed(sidecarData.flatMap(KindStatsSidecar.decoding))
             let cached = await snapshotCache.loadSnapshot(for: target)
             guard let self else { return }
             guard self.coordinator.phase == .restoring,
@@ -412,6 +417,20 @@ final class NeodiskViewModel {
                     lastScanDuration: info.lastScanDuration
                 )
                 self.snapshotWasRestoredWithoutRescan()
+                // Snapshots cached before sidecars existed (or whose sidecar
+                // went stale) get one now, so their next restore is seeded.
+                // No rescan is coming to write it via the save path.
+                let seedWasUsable = sidecarData
+                    .flatMap(KindStatsSidecar.decoding)?
+                    .matches(cached) == true
+                if !seedWasUsable {
+                    let backfill = await Task.detached(priority: .utility) {
+                        try? KindStatsSidecar.make(for: cached).encoded()
+                    }.value
+                    if let backfill {
+                        await snapshotCache.saveAuxiliaryData(backfill, forTargetID: target.id)
+                    }
+                }
             } else {
                 // Corrupt or vanished: forget the cache entry and scan live.
                 self.cachedScanInfo.removeValue(forKey: target.id)
@@ -450,6 +469,9 @@ final class NeodiskViewModel {
 
     private func restoreCachedSnapshot(for target: ScanTarget, canCancelRefresh: Bool = false) {
         Task { [weak self, snapshotCache] in
+            // Same sidecar-before-snapshot order as the no-rescan restore.
+            let sidecarData = await snapshotCache.loadAuxiliaryData(forTargetID: target.id)
+            self?.kinds.prepareSeed(sidecarData.flatMap(KindStatsSidecar.decoding))
             let cached = await snapshotCache.loadSnapshot(for: target)
             guard let self else { return }
             if let cached {
@@ -539,6 +561,19 @@ final class NeodiskViewModel {
                 // active diff of this target must rebase on it, and an
                 // inactive one may prefetch its baseline.
                 self?.diff.snapshotWasRotated(for: snapshot.target)
+                // Kind stats ride along so the next restore of this
+                // snapshot starts with a colored map. Utility priority:
+                // this is the same O(nodes) classification pass a restore
+                // would otherwise pay at the worst moment.
+                let sidecarData = await Task.detached(priority: .utility) {
+                    try? KindStatsSidecar.make(for: snapshot).encoded()
+                }.value
+                if let sidecarData {
+                    await snapshotCache.saveAuxiliaryData(
+                        sidecarData,
+                        forTargetID: snapshot.target.id
+                    )
+                }
             } catch {
                 FileHandle.standardError.write(
                     Data("Neodisk: failed to persist scan snapshot: \(error)\n".utf8)

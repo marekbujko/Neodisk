@@ -90,6 +90,12 @@ final class KindStatsModel {
     @ObservationIgnored private let fileListFilterDebouncer = SearchDebouncer()
     @ObservationIgnored private var catalogCache: [FileKindDisplayMode: FileKindCatalog] = [:]
     @ObservationIgnored private var catalogBuildTask: Task<Void, Never>?
+    /// Persisted stats loaded ahead of a snapshot restore, waiting for the
+    /// decoded snapshot to arrive and prove they describe it.
+    @ObservationIgnored private var pendingSeed: KindStatsSidecar?
+    /// Persisted stats proven to match the displayed snapshot: catalog
+    /// rebuilds (grouping mode, palette) skip the O(nodes) pass while set.
+    @ObservationIgnored private var activeSeed: KindStatsSidecar?
     @ObservationIgnored private var lastCatalogBuildTime: ContinuousClock.Instant?
     /// Rebuild throttle while partials stream in: at least the base
     /// interval, and never more than ~10% of the time spent building —
@@ -103,9 +109,19 @@ final class KindStatsModel {
     }
 
     /// Clears the displayed catalog before a new scan or snapshot takes the
-    /// screen (part of the model's per-scan state reset).
+    /// screen (part of the model's per-scan state reset). Seeds go too —
+    /// callers restoring a snapshot hand fresh ones over after the reset.
     func reset() {
         catalog = .empty
+        pendingSeed = nil
+        activeSeed = nil
+    }
+
+    /// Hands over persisted stats loaded ahead of a snapshot restore. They
+    /// stay pending until a complete snapshot arrives: a match seeds the
+    /// catalog rebuilds, a mismatch discards them.
+    func prepareSeed(_ sidecar: KindStatsSidecar?) {
+        pendingSeed = sidecar
     }
 
     /// The displayed tree changed: drop caches keyed to the old tree, then
@@ -125,6 +141,20 @@ final class KindStatsModel {
             return
         }
 
+        // A complete snapshot settles the seeds: pending stats either prove
+        // they describe this snapshot or die here, and stats matched to a
+        // previous tree (splices change the node count) stop being used.
+        if snapshot.isComplete {
+            if let pendingSeed, pendingSeed.matches(snapshot) {
+                activeSeed = pendingSeed
+            } else if let activeSeed, !activeSeed.matches(snapshot) {
+                self.activeSeed = nil
+            }
+            pendingSeed = nil
+        } else {
+            activeSeed = nil
+        }
+
         if !snapshot.isComplete,
            let lastCatalogBuildTime,
            ContinuousClock.now - lastCatalogBuildTime < catalogRebuildInterval {
@@ -138,10 +168,14 @@ final class KindStatsModel {
         catalogBuildTask?.cancel()
         let mode = displayMode
         let palette = palette
+        let seedStats = activeSeed?.stats(for: mode)
         catalogBuildTask = Task { [weak self] in
             let buildStart = ContinuousClock.now
             let catalog = await Task.detached(priority: .userInitiated) {
-                FileKindCatalog.build(from: store, mode: mode, palette: palette)
+                if let seedStats {
+                    return FileKindCatalog.build(fromAggregated: seedStats, mode: mode, palette: palette)
+                }
+                return FileKindCatalog.build(from: store, mode: mode, palette: palette)
             }.value
             let buildDuration = ContinuousClock.now - buildStart
             guard !Task.isCancelled, let self else { return }

@@ -150,31 +150,96 @@ struct FileKindCatalog: Sendable {
             sizeByKindID[kindID] = (existing.size + node.allocatedSize, existing.count + 1)
         }
 
-        let ranked = sizeByKindID.sorted {
-            if $0.value.size != $1.value.size {
-                return $0.value.size > $1.value.size
+        return build(
+            fromAggregated: sizeByKindID.map {
+                PersistedKindStat(kindID: $0.key, size: $0.value.size, count: $0.value.count)
+            },
+            mode: mode,
+            palette: palette
+        )
+    }
+
+    /// Ranking, palette assignment, and display-name resolution from
+    /// per-kind aggregates — the tail of `build(from:)`, split out so a
+    /// catalog can also rebuild from persisted aggregates (snapshot restore,
+    /// palette or grouping-mode switches) without an O(nodes) pass.
+    nonisolated static func build(
+        fromAggregated aggregated: [PersistedKindStat],
+        mode: FileKindDisplayMode,
+        palette: VizPalette = .standard
+    ) -> FileKindCatalog {
+        let ranked = aggregated.sorted {
+            if $0.size != $1.size {
+                return $0.size > $1.size
             }
-            return $0.key < $1.key
+            return $0.kindID < $1.kindID
         }
 
         let stats = ranked.enumerated().map { index, entry in
             let rgb: SIMD3<Float>
             switch mode {
             case .categories:
-                rgb = palette.categoryRGB[entry.key] ?? otherRGB
+                rgb = palette.categoryRGB[entry.kindID] ?? otherRGB
             case .types:
                 rgb = index < palette.kindPalette.count ? palette.kindPalette[index] : otherRGB
             }
             return FileKindStat(
-                kind: FileKindClassifier.kind(forID: entry.key, mode: mode),
-                totalAllocatedSize: entry.value.size,
-                fileCount: entry.value.count,
+                kind: FileKindClassifier.kind(forID: entry.kindID, mode: mode),
+                totalAllocatedSize: entry.size,
+                fileCount: entry.count,
                 rgb: rgb
             )
         }
 
         return FileKindCatalog(stats: stats, mode: mode)
     }
+
+    /// The catalog's aggregates in persistable form (colors and display
+    /// names are derived, so they are not stored).
+    var persistedStats: [PersistedKindStat] {
+        stats.map {
+            PersistedKindStat(
+                kindID: $0.kind.id,
+                size: $0.totalAllocatedSize,
+                count: $0.fileCount
+            )
+        }
+    }
+
+    /// Both grouping modes aggregated in a single pass over the tree — the
+    /// save-time producer of the persisted stats a restore rebuilds from.
+    nonisolated static func aggregateBothModes(
+        from store: FileTreeStore
+    ) -> (categories: [PersistedKindStat], types: [PersistedKindStat]) {
+        var categorySizes: [String: (size: Int64, count: Int)] = [:]
+        var typeSizes: [String: (size: Int64, count: Int)] = [:]
+
+        for node in store.allNodes {
+            guard FileKindClassifier.isKindCountable(node) else { continue }
+            let categoryID = FileKindClassifier.kindID(for: node, mode: .categories)
+            let typeID = FileKindClassifier.kindID(for: node, mode: .types)
+            let existingCategory = categorySizes[categoryID] ?? (0, 0)
+            categorySizes[categoryID] = (
+                existingCategory.size + node.allocatedSize,
+                existingCategory.count + 1
+            )
+            let existingType = typeSizes[typeID] ?? (0, 0)
+            typeSizes[typeID] = (existingType.size + node.allocatedSize, existingType.count + 1)
+        }
+
+        func persisted(_ sizes: [String: (size: Int64, count: Int)]) -> [PersistedKindStat] {
+            sizes.map { PersistedKindStat(kindID: $0.key, size: $0.value.size, count: $0.value.count) }
+        }
+        return (persisted(categorySizes), persisted(typeSizes))
+    }
+}
+
+/// One kind's persisted aggregate — enough to rebuild a FileKindCatalog
+/// without touching the tree.
+nonisolated struct PersistedKindStat: Codable, Sendable {
+    let kindID: String
+    let size: Int64
+    let count: Int
 }
 
 enum FileKindClassifier {
