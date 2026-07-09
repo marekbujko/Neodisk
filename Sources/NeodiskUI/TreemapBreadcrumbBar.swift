@@ -1,0 +1,97 @@
+//
+//  TreemapBreadcrumbBar.swift
+//  Neodisk
+//
+//  Finder-style path bar above the treemap. Shows the ancestry of the current
+//  selection (scan root → selected node). Clicking a crumb selects that
+//  ancestor, which highlights it on the map and expands it in the outline via
+//  model.select(_:). With nothing selected it shows just the scan root, so the
+//  bar is a persistent orientation strip rather than one that appears and
+//  disappears.
+//
+
+import SwiftUI
+import NeodiskKit
+
+struct TreemapBreadcrumbBar: View {
+    let model: NeodiskViewModel
+
+    /// Root → selected node. `path(to:)` returns `[root]` when the selection
+    /// is nil, so the bar always has at least the scan root to show.
+    private var crumbs: [FileNodeRecord] {
+        guard let store = model.store else { return [] }
+        return store.path(to: model.selectedNodeID)
+    }
+
+    var body: some View {
+        if crumbs.isEmpty {
+            // No scan loaded: take up no space (welcome/empty state).
+            Color.clear.frame(height: 0)
+        } else {
+            bar
+        }
+    }
+
+    private var bar: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 1) {
+                    ForEach(Array(crumbs.enumerated()), id: \.element.id) { index, node in
+                        if index > 0 {
+                            Image(systemName: "chevron.compact.right")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        Crumb(node: node, isLast: index == crumbs.count - 1) {
+                            // The root crumb clears the selection (shows the
+                            // whole map); any other crumb selects that folder.
+                            model.select(index == 0 ? nil : node.id)
+                        }
+                        .id(node.id)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 3)
+            }
+            .onChange(of: model.selectedNodeID) {
+                // Keep the deepest crumb in view as the selection moves.
+                guard let last = crumbs.last else { return }
+                withAnimation(.easeOut(duration: 0.15)) {
+                    proxy.scrollTo(last.id, anchor: .trailing)
+                }
+            }
+        }
+        .frame(height: 26)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
+    }
+}
+
+/// A single path segment. Ancestors are secondary and clickable; the trailing
+/// segment (the selection itself) is emphasized.
+private struct Crumb: View {
+    let node: FileNodeRecord
+    let isLast: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(node.name.isEmpty ? "/" : node.name)
+                .font(.caption)
+                .fontWeight(isLast ? .semibold : .regular)
+                .lineLimit(1)
+                .foregroundStyle(isLast ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(hovering ? Color.primary.opacity(0.08) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(NeodiskFormatters.size(node.allocatedSize))
+    }
+}

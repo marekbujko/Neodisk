@@ -358,9 +358,13 @@ private struct WorkspaceView: View {
 
                     PaneSplitter(width: $outlinePaneWidth, range: 240...600, edge: .leading)
 
-                    TreemapPane(model: model)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .layoutPriority(1)
+                    VStack(spacing: 0) {
+                        TreemapBreadcrumbBar(model: model)
+                        TreemapPane(model: model)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .layoutPriority(1)
 
                     if model.showKindStats {
                         PaneSplitter(width: $kindStatsPaneWidth, range: 200...340, edge: .trailing)
