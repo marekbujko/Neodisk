@@ -191,12 +191,19 @@ public struct ContentView: View {
                 }
             }
             .toggleStyle(.button)
-            .disabled(!model.diff.canShow && !model.diff.isShowing)
-            .help(model.diff.isLoading
-                ? "Loading the previous scan…"
-                : model.diff.isShowing
-                    ? "Hide changes since the previous scan"
-                    : "Show what grew since the previous scan")
+            // The diff renders in the outline pane, which sunburst hides —
+            // the toggle stays put (persistent toolbar) but disables there.
+            .disabled(
+                model.vizViewMode == .sunburst
+                    || (!model.diff.canShow && !model.diff.isShowing)
+            )
+            .help(model.vizViewMode == .sunburst
+                ? "Changes are shown in the treemap view"
+                : model.diff.isLoading
+                    ? "Loading the previous scan…"
+                    : model.diff.isShowing
+                        ? "Hide changes since the previous scan"
+                        : "Show what grew since the previous scan")
 
             Button {
                 model.showKindStats.toggle()

@@ -56,7 +56,16 @@ final class NeodiskViewModel {
     var sidebarVisibility = NavigationSplitViewVisibility.all
     /// Which visualization the center pane shows (treemap or sunburst).
     /// Preference mirroring happens where the toolbar switcher binds.
-    var vizViewMode: VizViewMode = .treemap
+    var vizViewMode: VizViewMode = .treemap {
+        didSet {
+            // The diff's visual surface (the outline's delta column) is
+            // hidden in sunburst and its toolbar toggle is disabled there —
+            // leaving the mode on would strand it behind a dead button.
+            if vizViewMode == .sunburst, oldValue != .sunburst, diff.isShowing {
+                diff.toggle()
+            }
+        }
+    }
 
     // MARK: Kind statistics
 
