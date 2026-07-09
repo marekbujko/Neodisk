@@ -106,6 +106,38 @@ import NeodiskKit
         #expect(model.zoomRootID == nil)
     }
 
+    @Test func testBreadcrumbReRootDrillsOutToAncestorKeepingSelection() throws {
+        let fixture = try makeFixture()
+        defer { fixture.tearDown() }
+        let model = fixture.model
+
+        // Drilled into `sub` with a file selected; clicking the scan-root
+        // crumb drills back out to it without disturbing the selection.
+        model.zoomRootID = fixture.sub.id
+        model.select(fixture.big.id)
+        #expect(model.reRoot(to: fixture.root.id))
+        #expect(model.zoomRootID == nil)
+        #expect(model.selectedNodeID == fixture.big.id)
+    }
+
+    @Test func testBreadcrumbReRootNeverDrillsIn() throws {
+        let fixture = try makeFixture()
+        defer { fixture.tearDown() }
+        let model = fixture.model
+
+        // At the full map, `sub` is below the root: clicking it must NOT
+        // re-root (drilling in is keyboard-only). The current-root crumb is
+        // likewise a no-op.
+        #expect(!model.reRoot(to: fixture.sub.id))
+        #expect(model.zoomRootID == nil)
+
+        model.zoomRootID = fixture.sub.id
+        #expect(!model.reRoot(to: fixture.sub.id))     // already the root
+        #expect(model.zoomRootID == fixture.sub.id)
+        #expect(!model.reRoot(to: fixture.big.id))     // a file, and below root
+        #expect(model.zoomRootID == fixture.sub.id)
+    }
+
     @Test func testDrillOutReRootsUpThenRejectsAtRoot() throws {
         let fixture = try makeFixture()
         defer { fixture.tearDown() }

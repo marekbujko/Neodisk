@@ -43,9 +43,13 @@ struct TreemapBreadcrumbBar: View {
                                 .foregroundStyle(.tertiary)
                         }
                         Crumb(node: node, isLast: index == crumbs.count - 1) {
-                            // The root crumb clears the selection (shows the
-                            // whole map); any other crumb selects that folder.
-                            model.select(index == 0 ? nil : node.id)
+                            // Clicking a folder above the current map root
+                            // drills back out to it (drilling in stays ⌘↓).
+                            // Otherwise: the root crumb clears the selection,
+                            // any other crumb selects that node.
+                            if !model.reRoot(to: node.id) {
+                                model.select(index == 0 ? nil : node.id)
+                            }
                         }
                         .id(node.id)
                     }

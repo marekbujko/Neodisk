@@ -714,6 +714,20 @@ final class NeodiskViewModel {
         return true
     }
 
+    /// Breadcrumb navigation: re-root the treemap OUT to an ancestor folder.
+    /// Only drills out — the target must be strictly above the current map
+    /// root; drilling in stays keyboard-only (⌘↓). The selection is left
+    /// untouched (it stays a descendant of the wider root). Returns false when
+    /// the crumb isn't an out target, so the caller can fall back to selecting.
+    @discardableResult
+    func reRoot(to nodeID: String) -> Bool {
+        guard let store, let node = store.node(id: nodeID), node.isDirectory,
+              let effectiveRootID, node.id != effectiveRootID,
+              store.isAncestor(node.id, of: effectiveRootID) else { return false }
+        zoomRootID = node.id == store.root.id ? nil : node.id
+        return true
+    }
+
     /// Keyboard drill-out (⌘↑): re-root the treemap one level up. Returns
     /// false (caller beeps) when already at the scan root.
     @discardableResult
