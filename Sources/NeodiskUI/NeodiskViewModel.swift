@@ -253,6 +253,13 @@ final class NeodiskViewModel {
         }
     }
 
+    /// The active visualization palette, driven by the colorblind Settings
+    /// toggle. Kind colors are baked into the catalog (see KindStatsModel);
+    /// age and status-bar swatch colors read this live.
+    var vizPalette: VizPalette {
+        preferences?.useColorblindPalette == true ? .colorblind : .standard
+    }
+
     /// The swatch color a node renders with on the map right now — the
     /// status bar's swatch must agree with the active color mode.
     func displayColor(for node: FileNodeRecord) -> Color {
@@ -261,7 +268,7 @@ final class NeodiskViewModel {
                 let rgb = FileKindCatalog.directoryRGB
                 return Color(red: Double(rgb.x), green: Double(rgb.y), blue: Double(rgb.z))
             }
-            return AgeBucket.bucket(for: node.lastModified, reference: referenceDate).color
+            return vizPalette.ageColor(AgeBucket.bucket(for: node.lastModified, reference: referenceDate))
         }
         return kinds.catalog.color(for: node)
     }
@@ -509,8 +516,20 @@ final class NeodiskViewModel {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateFreeSpace()
+                self?.syncVizPalette()
             }
         updateFreeSpace()
+        syncVizPalette()
+    }
+
+    /// Push the palette to the kind catalog when the colorblind toggle flips.
+    /// Kind colors are baked at build time, so the catalog rebuilds; age and
+    /// treemap colors update reactively as views re-read `vizPalette`.
+    private func syncVizPalette() {
+        let palette = vizPalette
+        if kinds.palette != palette {
+            kinds.palette = palette
+        }
     }
 
     private func updateFreeSpace() {

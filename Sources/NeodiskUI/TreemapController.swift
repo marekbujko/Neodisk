@@ -30,6 +30,7 @@ final class TreemapController {
         var highlight: TreemapHighlight?
         var expandedAggregateIDs: Set<String> = []
         var freeSpaceBytes: Int64?
+        var palette: VizPalette = .standard
     }
 
     private(set) var viewport = TreemapViewport.identity
@@ -60,7 +61,8 @@ final class TreemapController {
         colorMode: TreemapColorMode = .kind,
         highlight: TreemapHighlight? = nil,
         expandedAggregateIDs: Set<String>,
-        freeSpaceBytes: Int64? = nil
+        freeSpaceBytes: Int64? = nil,
+        palette: VizPalette = .standard
     ) {
         let newInputs = Inputs(
             snapshotID: snapshot?.id,
@@ -69,7 +71,8 @@ final class TreemapController {
             colorMode: colorMode,
             highlight: highlight,
             expandedAggregateIDs: expandedAggregateIDs,
-            freeSpaceBytes: freeSpaceBytes
+            freeSpaceBytes: freeSpaceBytes,
+            palette: palette
         )
         guard newInputs != inputs else { return }
 
@@ -368,6 +371,7 @@ final class TreemapController {
         let highlight = inputs.highlight
         let expandedAggregateIDs = inputs.expandedAggregateIDs
         let freeSpaceBytes = inputs.freeSpaceBytes
+        let palette = inputs.palette
         let scale = view?.window?.backingScaleFactor ?? 2
         renderTask = Task { [weak self] in
             let result = await Task.detached(priority: .userInitiated) {
@@ -378,7 +382,8 @@ final class TreemapController {
                     highlight: highlight,
                     expandedAggregateIDs: expandedAggregateIDs,
                     viewport: viewport,
-                    freeSpaceBytes: freeSpaceBytes
+                    freeSpaceBytes: freeSpaceBytes,
+                    palette: palette
                 )
                 let image = CushionTreemapRenderer.render(cells: scene.cells, bounds: scene.renderBounds, scale: scale)
                 return (scene, image)

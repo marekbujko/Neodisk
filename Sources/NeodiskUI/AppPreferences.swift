@@ -63,6 +63,9 @@ final class AppPreferences: ObservableObject {
     @AppStorage("autoSummarizeDirectories") var autoSummarizeDirectories = true
     @AppStorage("includeCloudStorage") var includeCloudStorage = false
     @AppStorage("showFreeSpace") var showFreeSpace = false
+    /// Swap the visualization's kind/age colors for a colorblind-safe palette
+    /// (Okabe-Ito + viridis). Applies immediately; see VizPalette.
+    @AppStorage("useColorblindPalette") var useColorblindPalette = false
     @AppStorage("useScanExclusions") var useScanExclusions = false
     /// One glob-style pattern per line (same syntax as .gitignore-lite:
     /// trailing "/" matches directories, "*" wildcards within a component).
@@ -93,6 +96,7 @@ final class AppPreferences: ObservableObject {
         )
         _includeCloudStorage = AppStorage(wrappedValue: false, "includeCloudStorage", store: defaults)
         _showFreeSpace = AppStorage(wrappedValue: false, "showFreeSpace", store: defaults)
+        _useColorblindPalette = AppStorage(wrappedValue: false, "useColorblindPalette", store: defaults)
         _useScanExclusions = AppStorage(wrappedValue: false, "useScanExclusions", store: defaults)
         _exclusionPatternsText = AppStorage(
             wrappedValue: ScanExclusionMatcher.commonPresetPatterns.joined(separator: "\n"),
@@ -148,6 +152,7 @@ final class AppPreferences: ObservableObject {
         autoSummarizeDirectories = true
         includeCloudStorage = false
         showFreeSpace = false
+        useColorblindPalette = false
         useScanExclusions = false
         exclusionPatternsText = ScanExclusionMatcher.commonPresetPatterns.joined(separator: "\n")
         autoRescanPolicyRaw = AutoRescanPolicy.smart.rawValue

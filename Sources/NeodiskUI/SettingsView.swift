@@ -115,6 +115,11 @@ private struct GeneralSettingsTab: View {
                 Text("Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+
+                Toggle("Use colorblind-safe colors", isOn: $preferences.useColorblindPalette)
+                Text("Swaps the file-kind and age colors for a palette that stays distinct with common color vision differences. Applies immediately.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Workspace") {

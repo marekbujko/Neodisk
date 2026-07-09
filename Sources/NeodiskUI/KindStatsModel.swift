@@ -23,6 +23,19 @@ final class KindStatsModel {
     private(set) var catalog: FileKindCatalog = .empty
     /// Whether kind statistics (and treemap colors) group by extension or by
     /// broad category. Switching rebuilds the catalog.
+    /// The active color palette (swapped by the colorblind Settings toggle).
+    /// Colors are baked into the catalog at build time, so changing this
+    /// drops the cache and rebuilds so the new colors take effect.
+    var palette: VizPalette = .standard {
+        didSet {
+            guard palette != oldValue else { return }
+            catalogCache = [:]
+            if let store = coordinator.snapshot?.treeStore {
+                rebuildCatalog(from: store)
+            }
+        }
+    }
+
     var displayMode: FileKindDisplayMode = .categories {
         didSet {
             guard displayMode != oldValue,
@@ -124,10 +137,11 @@ final class KindStatsModel {
     private func rebuildCatalog(from store: FileTreeStore) {
         catalogBuildTask?.cancel()
         let mode = displayMode
+        let palette = palette
         catalogBuildTask = Task { [weak self] in
             let buildStart = ContinuousClock.now
             let catalog = await Task.detached(priority: .userInitiated) {
-                FileKindCatalog.build(from: store, mode: mode)
+                FileKindCatalog.build(from: store, mode: mode, palette: palette)
             }.value
             let buildDuration = ContinuousClock.now - buildStart
             guard !Task.isCancelled, let self else { return }

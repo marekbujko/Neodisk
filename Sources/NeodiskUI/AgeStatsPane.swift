@@ -20,7 +20,7 @@ struct AgeStatsPane: View {
             StatsFileListView(
                 model: model,
                 title: model.ages.fileList?.bucket.displayName,
-                swatch: model.ages.fileList?.bucket.color,
+                swatch: model.ages.fileList.map { model.vizPalette.ageColor($0.bucket) },
                 backHelp: "Back to age groups",
                 isLoading: model.ages.isFileListLoading,
                 visibleIDs: model.ages.fileListVisibleIDs,
@@ -53,7 +53,7 @@ struct AgeStatsPane: View {
                 Spacer()
             } else {
                 List(model.ages.catalog.stats) { stat in
-                    AgeStatRow(stat: stat, totalSize: totalSize)
+                    AgeStatRow(stat: stat, totalSize: totalSize, palette: model.vizPalette)
                         .listRowSeparator(.hidden)
                         .contentShape(Rectangle())
                         .onTapGesture {
@@ -74,11 +74,12 @@ struct AgeStatsPane: View {
 private struct AgeStatRow: View {
     let stat: AgeStat
     let totalSize: Int64
+    let palette: VizPalette
 
     var body: some View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(stat.bucket.color)
+                .fill(palette.ageColor(stat.bucket))
                 .frame(width: 12, height: 12)
 
             VStack(alignment: .leading, spacing: 1) {

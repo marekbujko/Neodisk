@@ -126,7 +126,8 @@ struct TreemapScene: Sendable {
         highlight: TreemapHighlight? = nil,
         expandedAggregateIDs: Set<String> = [],
         viewport: TreemapViewport = .identity,
-        freeSpaceBytes: Int64? = nil
+        freeSpaceBytes: Int64? = nil,
+        palette: VizPalette = .standard
     ) -> TreemapScene {
         var cells: [TreemapCell] = []
         var labels: [CellLabel] = []
@@ -228,7 +229,7 @@ struct TreemapScene: Sendable {
             let isFreeSpace = node.id == freeSpaceNode?.id
             var rgb = isFreeSpace
                 ? Self.freeSpaceRGB
-                : baseRGB(for: node, colorMode: colorMode, catalog: catalog)
+                : baseRGB(for: node, colorMode: colorMode, catalog: catalog, palette: palette)
             // Plain directories never match a highlight (they are neither a
             // stats kind nor a countable age node), so undivided-directory
             // cells always dim — even when they contain matching files too
@@ -271,7 +272,8 @@ struct TreemapScene: Sendable {
     private nonisolated static func baseRGB(
         for node: FileNodeRecord,
         colorMode: TreemapColorMode,
-        catalog: FileKindCatalog
+        catalog: FileKindCatalog,
+        palette: VizPalette
     ) -> SIMD3<Float> {
         switch colorMode {
         case .kind:
@@ -280,7 +282,7 @@ struct TreemapScene: Sendable {
             guard FileKindClassifier.isKindCountable(node) else {
                 return FileKindCatalog.directoryRGB
             }
-            return AgeBucket.bucket(for: node.lastModified, reference: referenceDate).rgb
+            return palette.ageRGB(AgeBucket.bucket(for: node.lastModified, reference: referenceDate))
         }
     }
 

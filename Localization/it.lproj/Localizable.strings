@@ -232,3 +232,5 @@
 "The item at %@ is no longer available for Quick Look." = "L'elemento in %@ non è più disponibile per Occhiata.";
 "Free Space" = "Spazio libero";
 "just now" = "proprio ora";
+"Use colorblind-safe colors" = "Usa colori adatti al daltonismo";
+"Swaps the file-kind and age colors for a palette that stays distinct with common color vision differences. Applies immediately." = "Sostituisce i colori per tipo di file ed età con una palette che resta distinguibile con le comuni carenze della visione dei colori. Applicato immediatamente.";

@@ -38,7 +38,8 @@ struct TreemapPane: NSViewRepresentable {
             expandedAggregateIDs: model.expandedAggregateIDs,
             // Free space belongs to the volume as a whole; hide it once the
             // user zooms into a subfolder.
-            freeSpaceBytes: model.zoomRootID == nil ? model.freeSpaceBytes : nil
+            freeSpaceBytes: model.zoomRootID == nil ? model.freeSpaceBytes : nil,
+            palette: model.vizPalette
         )
         controller.setSelectedNode(model.selectedNodeID)
     }

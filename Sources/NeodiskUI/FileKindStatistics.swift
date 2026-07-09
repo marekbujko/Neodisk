@@ -138,7 +138,8 @@ struct FileKindCatalog: Sendable {
     /// per unique kind afterwards, through a cache shared across builds.
     nonisolated static func build(
         from store: FileTreeStore,
-        mode: FileKindDisplayMode = .types
+        mode: FileKindDisplayMode = .types,
+        palette: VizPalette = .standard
     ) -> FileKindCatalog {
         var sizeByKindID: [String: (size: Int64, count: Int)] = [:]
 
@@ -160,9 +161,9 @@ struct FileKindCatalog: Sendable {
             let rgb: SIMD3<Float>
             switch mode {
             case .categories:
-                rgb = categoryRGB[entry.key] ?? otherRGB
+                rgb = palette.categoryRGB[entry.key] ?? otherRGB
             case .types:
-                rgb = index < coloredKindLimit ? palette[index] : otherRGB
+                rgb = index < palette.kindPalette.count ? palette.kindPalette[index] : otherRGB
             }
             return FileKindStat(
                 kind: FileKindClassifier.kind(forID: entry.key, mode: mode),
