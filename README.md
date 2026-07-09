@@ -39,17 +39,19 @@ Delete and clean up safely in Finder instead.
 
 ## Features
 
-- Treemap: Pinch to zoom, scroll to pan.
-- Outline + file type statistics: size-sorted file tree and per-type totals.
-- Age heatmap: color the treemap by last-modified date.
-- Duplicate finder: content-hash verified duplicates.
-- Fast scanning: parallel traversal that backs off as the machine
-  heat-soaks, hard-link dedup, live progress, glob exclusions.
-- Search: `⌘F` fuzzy search over the entire scan. Quick Look on spacebar.
-- Snapshots & changes: completed scans persist and reopen instantly. The Changes (+/-)
-  toggle diffs against the previous scan to show what files grew, shrinked, got added, deleted.
-- Multilingual: the UI follows the macOS system language: English, Spanish,
-  French, German, Italian, Brazilian Portuguese, Japanese, and Simplified Chinese.
+- Pinch to zoom treemap, scroll to pan
+- Outline selected files
+- Find largest files
+- File type statistics
+- Age heatmap, color the treemap by last-modified date
+- Duplicate finder with content-hash verified duplicates
+- Fast scanning with live progress
+- Search: `⌘F` fuzzy search over the entire scan
+- Quick Look on spacebar
+- Drill into a folder with `⌘↓`, drill back out with `⌘↑`, or click folders in the breadcrumb bar
+- Snapshots, completed scans persist and reopen instantly
+- Changes (+/-) toggle diffs against the previous scan to show what files grew, shrinked, got added, deleted
+- Multilingual: UI follows macOS system language: English, Spanish, French, German, Italian, Brazilian Portuguese, Japanese, and Simplified Chinese
 
 ## Build & Run
 
