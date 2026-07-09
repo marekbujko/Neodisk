@@ -187,6 +187,9 @@ private struct OutlineTreeTable: NSViewRepresentable {
         tableView.quickLookRequested = { [weak coordinator] in
             coordinator?.toggleQuickLook() ?? false
         }
+        tableView.clickTrackingEnded = { [weak coordinator] in
+            coordinator?.resyncSelectionAfterClick()
+        }
         // .fullWidth: the only style whose frame equals the column width
         // exactly — .inset pads the table beyond the column, which pushes
         // the horizontal scroller into engaging with nothing to scroll.
@@ -318,7 +321,21 @@ private struct OutlineTreeTable: NSViewRepresentable {
             let delta: Int64?
         }
 
+        /// Row list + baseline that arrived while a click was being tracked;
+        /// applied when the click finishes.
+        private var pendingApply: ([NeodiskViewModel.OutlineRow], ScanSizeBaseline?)?
+
         func apply(rows newRows: [NeodiskViewModel.OutlineRow], baseline: ScanSizeBaseline?) {
+            // Mid-click, reloading would clear the row the user is holding
+            // the mouse on (and the deferred delegate would then report an
+            // empty selection). Keep the table frozen until tracking ends;
+            // `rows` also stays consistent with what the click landed on.
+            if let outlineTable = tableView as? OutlineNSTableView,
+               outlineTable.isTrackingClick {
+                pendingApply = (newRows, baseline)
+                return
+            }
+            pendingApply = nil
             let newFingerprints = newRows.map {
                 RowFingerprint(
                     id: $0.id,
@@ -390,6 +407,14 @@ private struct OutlineTreeTable: NSViewRepresentable {
 
         func syncSelection(to selectedID: String?) {
             guard let tableView else { return }
+            // A click in flight: the table already shows the clicked row but
+            // hasn't told us yet (the delegate fires when tracking ends).
+            // Syncing now would revert the user's click to the stale model
+            // value; clickTrackingEnded re-syncs once the delegate has run.
+            if let outlineTable = tableView as? OutlineNSTableView,
+               outlineTable.isTrackingClick {
+                return
+            }
             let targetRow = selectedID.flatMap { rowIndexByID[$0] }
             if let targetRow {
                 if tableView.selectedRow != targetRow {
@@ -409,6 +434,16 @@ private struct OutlineTreeTable: NSViewRepresentable {
                 }
                 lastRevealedID = selectedID
             }
+        }
+
+        /// Click tracking finished and the delegate has run: apply any rows
+        /// and model selection changes that arrived (and were held) mid-click.
+        func resyncSelectionAfterClick() {
+            if let (newRows, baseline) = pendingApply {
+                apply(rows: newRows, baseline: baseline)
+                applyColumnWidth()
+            }
+            syncSelection(to: model.selectedNodeID)
         }
 
         /// Vertical-only reveal: never disturbs an intentional horizontal
@@ -674,12 +709,25 @@ private final class OutlineRowSelectionState {
 /// responder, so typing spaces into the search field is unaffected.
 private final class OutlineNSTableView: NSTableView {
     var quickLookRequested: () -> Bool = { false }
+    /// True while a click's mouse-tracking session is running. The table
+    /// applies a click's selection at mouseDown but fires the delegate only
+    /// when tracking ends, so mid-click the selection legitimately disagrees
+    /// with the model — programmatic sync must not "correct" it back.
+    private(set) var isTrackingClick = false
+    var clickTrackingEnded: () -> Void = {}
 
     override func keyDown(with event: NSEvent) {
         if event.charactersIgnoringModifiers == " ", quickLookRequested() {
             return
         }
         super.keyDown(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        isTrackingClick = true
+        super.mouseDown(with: event)
+        isTrackingClick = false
+        clickTrackingEnded()
     }
 }
 
