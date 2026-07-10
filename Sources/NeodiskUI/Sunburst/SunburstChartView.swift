@@ -48,9 +48,13 @@ struct SunburstChartView: View {
     @State private var isHoveringCenter = false
     @State private var showsLoadingDiskMapProgress = false
     @State private var viewportTransform = SunburstViewportTransform.identity
+    /// The in-flight drill zoom (DaisyDisk-style); nil outside transitions.
+    /// Rendering derives from this plus the TimelineView frame date.
+    @State private var zoomTransition: SunburstZoomTransitionState?
 
     private var canAdjustViewport: Bool {
         !chartModel.isLayoutPending && !chartModel.renderedSegments.isEmpty
+            && zoomTransition == nil
     }
 
     private var loadingDiskMapProgressTaskID: String {
@@ -61,7 +65,9 @@ struct SunburstChartView: View {
         GeometryReader { geometry in
             let baseChartFrame = chartFrame(in: geometry.size)
 
-            accessibleChart(baseChartFrame: baseChartFrame)
+            TimelineView(.animation(minimumInterval: nil, paused: zoomTransition == nil)) { timeline in
+                accessibleChart(baseChartFrame: baseChartFrame, now: timeline.date)
+            }
                 .animation(chartTransitionAnimation, value: chartModel.renderedLayoutVersion)
                 .animation(centerHoverAnimation, value: isHoveringCenter)
                 .animation(loadingIndicatorAnimation, value: showsLoadingDiskMapProgress)
@@ -70,6 +76,18 @@ struct SunburstChartView: View {
                 }
                 .onChange(of: viewportResetID) { _, _ in
                     resetViewport(animated: false)
+                }
+                // Fires before the layout task below replaces the rendered
+                // segments, so the outgoing layout can still be captured.
+                .onChange(of: layoutID) { previousLayoutID, nextLayoutID in
+                    prepareZoomTransition(fromLayoutID: previousLayoutID, toLayoutID: nextLayoutID)
+                }
+                .onChange(of: chartModel.isLayoutPending) { _, isPending in
+                    guard !isPending else { return }
+                    zoomTransitionLayoutDidLand()
+                }
+                .task(id: zoomTransition?.id) {
+                    await finalizeZoomTransition()
                 }
                 .task(id: loadingDiskMapProgressTaskID) {
                     await updateLoadingDiskMapProgress(isPending: chartModel.isLayoutPending)
@@ -92,8 +110,8 @@ struct SunburstChartView: View {
         }
     }
 
-    private func accessibleChart(baseChartFrame: CGRect) -> some View {
-        interactiveChart(baseChartFrame: baseChartFrame)
+    private func accessibleChart(baseChartFrame: CGRect, now: Date) -> some View {
+        interactiveChart(baseChartFrame: baseChartFrame, now: now)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Disk usage chart")
             .accessibilityValue(Text(verbatim: accessibilityValue))
@@ -109,8 +127,8 @@ struct SunburstChartView: View {
             }
     }
 
-    private func interactiveChart(baseChartFrame: CGRect) -> some View {
-        chartLayers(chartFrame: viewportTransform.frame(for: baseChartFrame))
+    private func interactiveChart(baseChartFrame: CGRect, now: Date) -> some View {
+        chartLayers(chartFrame: viewportTransform.frame(for: baseChartFrame), now: now)
             .contentShape(Rectangle())
             .overlay {
                 interactionOverlay(
@@ -124,7 +142,11 @@ struct SunburstChartView: View {
     // MARK: - Chart layers
 
     @ViewBuilder
-    private func chartLayers(chartFrame: CGRect) -> some View {
+    private func chartLayers(chartFrame: CGRect, now: Date) -> some View {
+        let zoomPresentation = zoomTransition.map {
+            SunburstZoomPresentation(state: $0, now: now)
+        }
+
         ZStack {
             SunburstRenderedChartLayer(
                 segments: chartModel.renderedSegments,
@@ -136,18 +158,36 @@ struct SunburstChartView: View {
                 chartFrame: chartFrame
             )
             .id(chartModel.renderedLayoutVersion)
-            .transition(chartTransition)
+            // During a zoom the transition canvas replaces the base layer
+            // outright (the identity swap must not add its own fade on
+            // top). Every takeover and teardown boundary lands on
+            // pixel-identical content, so the swaps are invisible cuts.
+            .transition(zoomTransition == nil ? chartTransition : .identity)
+            .opacity(zoomTransition == nil ? 1 : 0)
             .allowsHitTesting(false)
 
-            SunburstHoverOverlay(
-                segment: chartModel.hoveredSegment
-            )
-            .equatable()
-            .frame(width: chartFrame.width, height: chartFrame.height)
-            .position(x: chartFrame.midX, y: chartFrame.midY)
-            .allowsHitTesting(false)
+            if let zoomTransition, let zoomPresentation {
+                SunburstZoomTransitionCanvas(
+                    state: zoomTransition,
+                    presentation: zoomPresentation
+                )
+                .frame(width: chartFrame.width, height: chartFrame.height)
+                .position(x: chartFrame.midX, y: chartFrame.midY)
+                .allowsHitTesting(false)
+            }
 
-            if !chartModel.isLayoutPending, !chartModel.renderedSegments.isEmpty {
+            if zoomPresentation == nil {
+                SunburstHoverOverlay(
+                    segment: chartModel.hoveredSegment
+                )
+                .equatable()
+                .frame(width: chartFrame.width, height: chartFrame.height)
+                .position(x: chartFrame.midX, y: chartFrame.midY)
+                .allowsHitTesting(false)
+            }
+
+            if !chartModel.isLayoutPending, !chartModel.renderedSegments.isEmpty,
+               zoomPresentation == nil {
                 if parentNode != nil, isHoveringCenter {
                     // The "go up" affordance takes the hole over while the
                     // cursor is on it; the size text returns on exit.
@@ -174,7 +214,10 @@ struct SunburstChartView: View {
                 }
             }
 
-            if chartModel.isLayoutPending {
+            // The zoom transition already shows meaningful motion while the
+            // layout loads; dimming it would read as a glitch. The timeout
+            // in the transition state brings this back for slow loads.
+            if chartModel.isLayoutPending, zoomPresentation == nil {
                 Color(nsColor: .windowBackgroundColor)
                     .opacity(0.28)
                     .allowsHitTesting(false)
@@ -184,7 +227,7 @@ struct SunburstChartView: View {
                         .controlSize(.small)
                         .transition(.opacity)
                 }
-            } else if chartModel.renderedSegments.isEmpty {
+            } else if !chartModel.isLayoutPending, chartModel.renderedSegments.isEmpty {
                 ProgressView()
                     .controlSize(.small)
             }
@@ -199,11 +242,11 @@ struct SunburstChartView: View {
         canAdjustViewport: Bool
     ) -> some View {
         let onHover: (CGPoint?) -> Void = { location in
-            guard !chartModel.isLayoutPending else { return }
+            guard !chartModel.isLayoutPending, zoomTransition == nil else { return }
             updateHover(at: location, in: baseChartFrame)
         }
         let onClick: (CGPoint, Int) -> Void = { location, clickCount in
-            guard !chartModel.isLayoutPending else { return }
+            guard !chartModel.isLayoutPending, zoomTransition == nil else { return }
             handleClick(at: location, in: baseChartFrame, clickCount: clickCount)
         }
         let onPan: (CGSize) -> Void = { delta in
@@ -216,14 +259,14 @@ struct SunburstChartView: View {
             canStartPan(at: location, in: baseChartFrame)
         }
         let menuProvider: (CGPoint) -> NSMenu? = { location in
-            guard !chartModel.isLayoutPending,
+            guard !chartModel.isLayoutPending, zoomTransition == nil,
                   let segment = hitTest(at: location, in: baseChartFrame) else {
                 return nil
             }
             return contextMenu(segment)
         }
         let helpProvider: (CGPoint) -> String? = { location in
-            guard !chartModel.isLayoutPending else { return nil }
+            guard !chartModel.isLayoutPending, zoomTransition == nil else { return nil }
             return help(at: location, in: baseChartFrame)
         }
 
@@ -262,6 +305,119 @@ struct SunburstChartView: View {
 
     private var viewportAnimation: Animation {
         reduceMotion ? .linear(duration: 0.01) : .easeOut(duration: 0.16)
+    }
+
+    // MARK: - Zoom transition
+
+    /// Starts the DaisyDisk-style drill zoom when the layout identity moves
+    /// to a different root within the same snapshot. Drilling in animates
+    /// immediately on the outgoing layout; zooming out waits for the parent
+    /// layout to land and plays the reverse. Everything else (rescans,
+    /// unrendered targets, Reduce Motion) keeps the plain fade.
+    private func prepareZoomTransition(fromLayoutID: String, toLayoutID: String) {
+        guard !reduceMotion else {
+            zoomTransition = nil
+            return
+        }
+
+        // layoutID is "snapshot|root|depth|freeSpace" (see SunburstPane).
+        let previousParts = fromLayoutID.split(separator: "|", omittingEmptySubsequences: false)
+        let nextParts = toLayoutID.split(separator: "|", omittingEmptySubsequences: false)
+        guard previousParts.count == 4, nextParts.count == 4,
+              previousParts[0] == nextParts[0],
+              previousParts[1] != nextParts[1] else {
+            zoomTransition = nil
+            return
+        }
+
+        let previousRootID = String(previousParts[1])
+        let nextRootID = String(nextParts[1])
+        let outgoingSegments = chartModel.renderedSegments
+        guard !outgoingSegments.isEmpty else {
+            zoomTransition = nil
+            return
+        }
+
+        if let focus = chartModel.segment(forNodeID: nextRootID) {
+            zoomTransition = .zoomIn(segments: outgoingSegments, focus: focus)
+        } else if treeStore.isAncestor(nextRootID, of: previousRootID) {
+            zoomTransition = .zoomOut(
+                previousSegments: outgoingSegments,
+                previousRootID: previousRootID
+            )
+        } else {
+            zoomTransition = nil
+        }
+    }
+
+    /// The drilled layout landed: zoom-in can start its end crossfade;
+    /// zoom-out resolves its focus in the new layout and starts the reverse
+    /// animation (or falls back to the plain swap if the outgoing root has
+    /// no segment there — pooled away or beyond the depth limit).
+    private func zoomTransitionLayoutDidLand() {
+        guard var transition = zoomTransition, transition.layoutReadyDate == nil else { return }
+
+        switch transition.direction {
+        case .zoomIn:
+            guard let focus = transition.focus else {
+                zoomTransition = nil
+                return
+            }
+            transition.incomingSegments = chartModel.renderedSegments
+            transition.handoffFadeDepthThreshold = Self.handoffFadeDepthThreshold(
+                animatedSegments: transition.animatedSegments,
+                focus: focus
+            )
+            transition.layoutReadyDate = Date()
+        case .zoomOut:
+            guard let previousRootID = transition.previousRootID,
+                  let focus = chartModel.segment(forNodeID: previousRootID),
+                  !chartModel.renderedSegments.isEmpty else {
+                zoomTransition = nil
+                return
+            }
+            transition.animatedSegments = chartModel.renderedSegments
+            transition.focus = focus
+            transition.handoffFadeDepthThreshold = Self.handoffFadeDepthThreshold(
+                animatedSegments: transition.animatedSegments,
+                focus: focus
+            )
+            transition.layoutReadyDate = Date()
+        }
+
+        zoomTransition = transition
+    }
+
+    /// The deepest ring the remap can carry: animated ring `d` lands
+    /// `focus.depth + 1` rings shallower, so anything in the other layout
+    /// past this depth has no remapped counterpart and alpha-fades at the
+    /// handoff (incoming deep rings on zoom-in, the outgoing chart's
+    /// orphaned outermost rings on zoom-out).
+    private static func handoffFadeDepthThreshold(
+        animatedSegments: [SunburstSegment],
+        focus: SunburstSegment
+    ) -> Int {
+        let maxAnimatedDepth = animatedSegments.map(\.depth).max() ?? 0
+        return maxAnimatedDepth - focus.depth - 1
+    }
+
+    /// Clears the transition state once its presentation reports finished
+    /// (the TimelineView pauses again and the base layer takes over at full
+    /// opacity, pixel-identical to the last transition frame).
+    private func finalizeZoomTransition() async {
+        while let transition = zoomTransition {
+            if SunburstZoomPresentation(state: transition, now: Date()).isFinished {
+                break
+            }
+            do {
+                try await Task.sleep(for: .milliseconds(40))
+            } catch {
+                return
+            }
+        }
+
+        guard !Task.isCancelled else { return }
+        zoomTransition = nil
     }
 
     // MARK: - Hover & click

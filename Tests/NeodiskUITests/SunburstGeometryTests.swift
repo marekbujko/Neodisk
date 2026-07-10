@@ -505,6 +505,47 @@ import NeodiskKit
         #expect(freshSegment.fillRGB == VizPalette.standard.ageRGB(.day))
         #expect(staleSegment.fillRGB == VizPalette.standard.ageRGB(.older))
     }
+
+    // MARK: - Angular seam
+
+    @Test func drawnArcsInsetHalfTheSeamPerEdge() {
+        let (start, end) = SunburstRenderer.seamInsetAngles(
+            startRadians: 1,
+            endRadians: 2,
+            innerRadius: 0.4,
+            outerRadius: 0.6
+        )
+
+        let expectedInset = (Double(SunburstLayout.angularSeam) / 2) / 0.5
+        #expect(abs(start - (1 + expectedInset)) < 0.0001)
+        #expect(abs(end - (2 - expectedInset)) < 0.0001)
+    }
+
+    @Test func fullCircleArcsStaySealed() {
+        let (start, end) = SunburstRenderer.seamInsetAngles(
+            startRadians: 0,
+            endRadians: .pi * 2,
+            innerRadius: 0.4,
+            outerRadius: 0.6
+        )
+
+        #expect(start == 0)
+        #expect(end == .pi * 2)
+    }
+
+    @Test func tinySliversCapTheSeamInset() {
+        let span = 0.002
+        let (start, end) = SunburstRenderer.seamInsetAngles(
+            startRadians: 1,
+            endRadians: 1 + span,
+            innerRadius: 0.4,
+            outerRadius: 0.6
+        )
+
+        // The seam yields before the item does: most of the arc survives.
+        #expect(end > start)
+        #expect((end - start) >= span * 0.6)
+    }
 }
 
 // MARK: - Helpers

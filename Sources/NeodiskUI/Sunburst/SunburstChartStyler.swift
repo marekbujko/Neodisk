@@ -24,6 +24,16 @@ enum SunburstChartStyler {
     static func baseStyle(
         for segment: SunburstSegment
     ) -> SunburstSegmentDrawingStyle {
+        baseStyle(for: segment, effectiveDepth: Double(segment.depth))
+    }
+
+    /// Base style at a fractional ring depth — the zoom transition blends a
+    /// segment's depth as it shifts rings, so the depth-faded fill opacity
+    /// glides instead of popping a shade at the handoff.
+    static func baseStyle(
+        for segment: SunburstSegment,
+        effectiveDepth: Double
+    ) -> SunburstSegmentDrawingStyle {
         if segment.isAggregate {
             return SunburstSegmentDrawingStyle(
                 fillBaseColor: Color(nsColor: .tertiaryLabelColor),
@@ -33,7 +43,7 @@ enum SunburstChartStyler {
             )
         }
 
-        let baseOpacity = standardOpacity(for: segment)
+        let baseOpacity = standardOpacity(for: segment, depth: effectiveDepth)
 
         return SunburstSegmentDrawingStyle(
             fillBaseColor: baseColor(for: segment),
@@ -101,10 +111,14 @@ enum SunburstChartStyler {
     }
 
     private static func standardOpacity(for segment: SunburstSegment) -> Double {
+        standardOpacity(for: segment, depth: Double(segment.depth))
+    }
+
+    private static func standardOpacity(for segment: SunburstSegment, depth: Double) -> Double {
         if segment.colorToken.role == .freeSpace {
             return 0.34
         }
-        return max(0.24, 0.78 - (Double(segment.depth) * 0.09) - (segment.isAggregate ? 0.16 : 0))
+        return max(0.24, 0.78 - (depth * 0.09) - (segment.isAggregate ? 0.16 : 0))
     }
 
     private static func hoverFillOpacity(for segment: SunburstSegment) -> Double {

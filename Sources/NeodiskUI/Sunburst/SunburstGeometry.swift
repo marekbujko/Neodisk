@@ -119,6 +119,11 @@ enum SunburstLayout {
     /// the bands as glued (see SunburstHitTestIndex) so hovering the gap
     /// still lands on the arc it hangs off, never a dead zone.
     nonisolated static let ringGap: CGFloat = 0.015
+    /// Background seam between neighbors within the same ring, as arc
+    /// length in units of the chart radius — thinner than the radial ring
+    /// gap. Applied at draw time (each edge insets half), never to angles
+    /// or hit-testing, so layout math and hovering are unaffected.
+    nonisolated static let angularSeam: CGFloat = 0.008
     /// The synthetic free-space segment's id; exists in no tree store.
     nonisolated static let freeSpaceSegmentID = "__sunburst-free-space__"
 
@@ -578,13 +583,71 @@ enum SunburstLayout {
 
 enum SunburstRenderer {
     nonisolated static func path(for segment: SunburstSegment, in size: CGSize) -> Path {
+        path(
+            startRadians: segment.startAngle.radians,
+            endRadians: segment.endAngle.radians,
+            innerRadius: segment.innerRadius,
+            outerRadius: segment.outerRadius,
+            in: size
+        )
+    }
+
+    /// Same arc construction for transient geometry (the zoom transition's
+    /// remapped arcs), which is not backed by a SunburstSegment.
+    nonisolated static func path(for arc: SunburstZoomArc, in size: CGSize) -> Path {
+        path(
+            startRadians: arc.startRadians,
+            endRadians: arc.endRadians,
+            innerRadius: arc.innerRadius,
+            outerRadius: arc.outerRadius,
+            in: size
+        )
+    }
+
+    /// Draw-time angular edges: neighbors in a ring each give up half the
+    /// seam so the background shows as a hairline between them. Full-circle
+    /// arcs stay sealed (a lone slit at 12 o'clock reads as a glitch), and
+    /// tiny slivers cap the inset so the seam yields before the item does.
+    nonisolated static func seamInsetAngles(
+        startRadians: Double,
+        endRadians: Double,
+        innerRadius: CGFloat,
+        outerRadius: CGFloat
+    ) -> (start: Double, end: Double) {
+        let span = endRadians - startRadians
+        guard span > 0, span < (2 * .pi) - 0.001 else {
+            return (startRadians, endRadians)
+        }
+
+        let midRadius = Double(innerRadius + outerRadius) / 2
+        guard midRadius > 0.001 else {
+            return (startRadians, endRadians)
+        }
+
+        let inset = min((Double(SunburstLayout.angularSeam) / 2) / midRadius, span * 0.18)
+        return (startRadians + inset, endRadians - inset)
+    }
+
+    private nonisolated static func path(
+        startRadians: Double,
+        endRadians: Double,
+        innerRadius: CGFloat,
+        outerRadius: CGFloat,
+        in size: CGSize
+    ) -> Path {
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let maxRadius = min(size.width, size.height) / 2
-        let innerRadius = maxRadius * segment.innerRadius
-        let outerRadius = maxRadius * segment.outerRadius
+        let (seamStart, seamEnd) = seamInsetAngles(
+            startRadians: startRadians,
+            endRadians: endRadians,
+            innerRadius: innerRadius,
+            outerRadius: outerRadius
+        )
+        let innerRadius = maxRadius * innerRadius
+        let outerRadius = maxRadius * outerRadius
 
-        let start = segment.startAngle.radians - (.pi / 2)
-        let end = segment.endAngle.radians - (.pi / 2)
+        let start = seamStart - (.pi / 2)
+        let end = seamEnd - (.pi / 2)
 
         var path = Path()
         path.addArc(
