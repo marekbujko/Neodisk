@@ -6,8 +6,20 @@
 //  Doubles in the chart's local pixel space (origin top-left); NeodiskUI adds
 //  thin CGPoint/CGSize overloads. Ported from Radix.
 //
+//  Stdlib only apart from `atan2` (point → angle), imported from the platform
+//  math library rather than Foundation to keep the module Embedded-Swift
+//  friendly. On a wasm Embedded build `atan2` needs the toolchain's libm (or
+//  the widget can hit-test in JS from the segment list); see the extraction
+//  notes.
+//
 
-import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(WASILibc)
+import WASILibc
+#endif
 
 public enum SunburstHitTester {
     public nonisolated static func segment(

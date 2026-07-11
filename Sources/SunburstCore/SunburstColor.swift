@@ -7,8 +7,9 @@
 //  vary around it, and depth darkens/desaturates. Pure — HSB/RGB math and FNV
 //  hashing only, no SwiftUI Color (that stays in NeodiskUI).
 //
-
-import Foundation
+//  Stdlib only (no Foundation) so it stays Embedded-Swift-compatible for the
+//  wasm build; SIMD3 and the FloatingPoint math are all stdlib.
+//
 
 public enum SunburstColorRole: Hashable, Sendable {
     case normal

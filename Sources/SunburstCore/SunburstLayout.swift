@@ -8,10 +8,11 @@
 //  pass (kept in NeodiskUI, which knows the app's palettes), so color changes
 //  never re-lay the chart out.
 //
-//  Pure and generic over `SunburstTreeReading`: no SwiftUI, no NeodiskKit.
+//  Pure and generic over `SunburstTreeReading`: no SwiftUI, no NeodiskKit,
+//  no Foundation — stdlib only, so it stays Embedded-Swift-compatible for the
+//  wasm build. Display strings for the synthetic arcs are passed in by the
+//  caller (NeodiskUI localizes them) rather than resolved via NSLocalizedString.
 //
-
-import Foundation
 
 public enum SunburstLayout {
     public nonisolated static let centerRadius: Double = 0.22
@@ -55,6 +56,8 @@ public enum SunburstLayout {
         freeSpaceBytes: Int64? = nil,
         hiddenSpaceBytes: Int64? = nil,
         expandedAggregateIDs: Set<String> = [],
+        freeSpaceLabel: String = "Free Space",
+        hiddenSpaceLabel: String = "Hidden Space",
         cancellationCheck: CancellationCheck
     ) throws -> [SunburstSegment] {
         guard depthLimit > 0 else { return [] }
@@ -103,7 +106,7 @@ public enum SunburstLayout {
             result.append(SunburstSegment(
                 id: hiddenSpaceSegmentID,
                 nodeID: nil,
-                label: NSLocalizedString("Hidden Space", comment: "Sunburst hidden-space segment label"),
+                label: hiddenSpaceLabel,
                 startAngle: .pi * 2 - freeAngle - hiddenAngle,
                 endAngle: .pi * 2 - freeAngle,
                 innerRadius: ringStart,
@@ -118,7 +121,7 @@ public enum SunburstLayout {
             result.append(SunburstSegment(
                 id: freeSpaceSegmentID,
                 nodeID: nil,
-                label: NSLocalizedString("Free Space", comment: "Sunburst free-space segment label"),
+                label: freeSpaceLabel,
                 startAngle: .pi * 2 - freeAngle,
                 endAngle: .pi * 2,
                 innerRadius: ringStart,
@@ -284,7 +287,10 @@ public enum SunburstLayout {
             let itemCount = groupedNodes.reduce(0) {
                 $0 + ($1.isDirectory ? max($1.descendantFileCount, 1) : 1)
             }
-            let aggregateID = "aggregate-\(children.first?.id ?? UUID().uuidString)"
+            // `children` is non-empty here (guarded above), so `first` always
+            // resolves; the `?? ""` only satisfies the optional and avoids a
+            // Foundation UUID fallback that never runs.
+            let aggregateID = "aggregate-\(children.first?.id ?? "")"
             visible.append(GroupEntry(
                 id: aggregateID,
                 nodeID: nil,

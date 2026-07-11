@@ -44,6 +44,8 @@ actor SunburstLayoutService: SunburstLayouting {
             freeSpaceBytes: request.freeSpaceBytes,
             hiddenSpaceBytes: request.hiddenSpaceBytes,
             expandedAggregateIDs: request.expandedAggregateIDs,
+            freeSpaceLabel: NSLocalizedString("Free Space", comment: "Sunburst free-space segment label"),
+            hiddenSpaceLabel: NSLocalizedString("Hidden Space", comment: "Sunburst hidden-space segment label"),
             cancellationCheck: Task.checkCancellation
         )
     }
