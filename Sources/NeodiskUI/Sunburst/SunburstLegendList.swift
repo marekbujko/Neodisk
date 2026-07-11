@@ -91,7 +91,7 @@ struct SunburstLegendList: View {
 
     @ViewBuilder
     private func interactiveRow(_ row: SunburstLegendRow, isHighlighted: Bool) -> some View {
-        LegendRowView(
+        let rowView = LegendRowView(
             row: row,
             isHeader: false,
             isSelected: isSelected(row),
@@ -113,6 +113,22 @@ struct SunburstLegendList: View {
         .contextMenu {
             contextMenuItems(for: row)
         }
+
+        if let helpText = helpText(for: row) {
+            rowView.help(helpText)
+        } else {
+            rowView
+        }
+    }
+
+    /// Hidden space is the one legend entry whose meaning isn't obvious
+    /// from its label; a tooltip explains what pooled into it.
+    private func helpText(for row: SunburstLegendRow) -> String? {
+        guard row.target == .hiddenSpace else { return nil }
+        return NSLocalizedString(
+            "Purgeable space, local snapshots, and files the scan could not see.",
+            comment: "Hidden-space explanation tooltip"
+        )
     }
 
     private func isSelected(_ row: SunburstLegendRow) -> Bool {
@@ -120,13 +136,16 @@ struct SunburstLegendList: View {
         return nodeID == model.selectedNodeID
     }
 
-    /// The row the chart hover maps to: the free-space row, the aggregate
-    /// row, the hovered node's own row, or its top-level ancestor's row.
-    /// List-row hover feeds the same model state, so a hovered row
-    /// highlights itself through this too.
+    /// The row the chart hover maps to: the free/hidden-space rows, the
+    /// aggregate row, the hovered node's own row, or its top-level
+    /// ancestor's row. List-row hover feeds the same model state, so a
+    /// hovered row highlights itself through this too.
     private func highlightedRowID(in rows: [SunburstLegendRow]) -> String? {
         if model.hoveredCellIsFreeSpace {
             return rows.first { $0.target == .freeSpace }?.id
+        }
+        if model.hoveredCellIsHiddenSpace {
+            return rows.first { $0.target == .hiddenSpace }?.id
         }
         guard let hoveredID = model.hoveredNodeID, let store = model.store else { return nil }
         if model.hoveredAggregate != nil, hoveredID == displayedFolder.id {

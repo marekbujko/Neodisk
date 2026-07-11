@@ -278,6 +278,44 @@ import NeodiskKit
         #expect(!plain.cells.contains { $0.isFreeSpace })
     }
 
+    @Test func hiddenSpaceNodeJoinsRootLayoutAlongsideFreeSpace() throws {
+        let store = makeStore()
+        let size = CGSize(width: 400, height: 300)
+        let scene = TreemapScene.build(
+            store: store, rootID: "/scan", size: size,
+            catalog: .empty, freeSpaceBytes: 1_000, hiddenSpaceBytes: 1_000
+        )
+
+        // Tree total is 1000, so each synthetic block owns a third of the
+        // canvas — and they stay distinct cells with distinct fills.
+        let freeCell = try #require(scene.cells.first { $0.isFreeSpace })
+        let hiddenCell = try #require(scene.cells.first { $0.isHiddenSpace })
+        #expect(freeCell.nodeID != hiddenCell.nodeID)
+        #expect(!hiddenCell.isFreeSpace)
+        #expect(hiddenCell.rgb == TreemapScene.hiddenSpaceRGB)
+        let hiddenArea = Double(hiddenCell.rect.width * hiddenCell.rect.height)
+        #expect(abs(hiddenArea - 400 * 300 / 3) < 1)
+
+        // Full coverage preserved, and rect(forNodeID:) agrees with the
+        // sibling layout shifted by both synthetic nodes.
+        let totalArea = scene.cells.reduce(0.0) { $0 + Double($1.rect.width * $1.rect.height) }
+        #expect(abs(totalArea - 400 * 300) < 1)
+        let movCell = try #require(scene.cells.first { $0.nodeID == "/scan/a.mov" })
+        let movRect = try #require(scene.rect(forNodeID: "/scan/a.mov", in: store))
+        #expect(abs(movRect.minX - movCell.rect.minX) < 0.001)
+        #expect(abs(movRect.width - movCell.rect.width) < 0.001)
+
+        // Hidden space renders without free space too, and is off by default.
+        let hiddenOnly = TreemapScene.build(
+            store: store, rootID: "/scan", size: size,
+            catalog: .empty, hiddenSpaceBytes: 500
+        )
+        #expect(hiddenOnly.cells.contains { $0.isHiddenSpace })
+        #expect(!hiddenOnly.cells.contains { $0.isFreeSpace })
+        let plain = TreemapScene.build(store: store, rootID: "/scan", size: size, catalog: .empty)
+        #expect(!plain.cells.contains { $0.isHiddenSpace })
+    }
+
     @Test func kindHighlightKeepsMatchesAndDimsRest() throws {
         let store = makeStore()
         let size = CGSize(width: 400, height: 300)

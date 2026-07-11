@@ -53,6 +53,8 @@
 
 /* MARK: - Status bar */
 "Free space on this volume" = "Freier Speicherplatz auf diesem Volume";
+"Hidden space on this volume" = "Verborgener Speicherplatz auf diesem Volume";
+"Purgeable space, local snapshots, and files the scan could not see." = "Bereinigbarer Speicher, lokale Schnappschüsse und Dateien, die der Scan nicht sehen konnte.";
 "%@ smaller items in %@" = "%@ kleinere Elemente in %@";
 "Hover the treemap or select a row to inspect an item." = "Bewege den Zeiger über die Treemap oder wähle eine Zeile, um ein Element zu untersuchen.";
 
@@ -81,7 +83,7 @@
 "One pattern per line. Trailing “/” matches folders; “*” is a wildcard." = "Ein Muster pro Zeile. Ein abschließendes „/“ steht für Ordner; „*“ ist ein Platzhalter.";
 "Add Presets" = "Voreinstellungen hinzufügen";
 "Show free space in visualizations" = "Freien Speicherplatz in den Visualisierungen anzeigen";
-"Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately." = "Freier Speicherplatz erscheint nur bei Volume-Scans und verwendet die von macOS gemeldete verfügbare Kapazität, die bereinigbaren APFS-Speicher einschließen kann. Gilt sofort.";
+"Free and hidden space appear only for volume scans. Free space uses macOS available capacity; hidden space is the remaining capacity the scan could not see, such as purgeable space and local snapshots. Applies immediately." = "Freier und verborgener Speicherplatz erscheinen nur bei Volume-Scans. Freier Speicherplatz verwendet die von macOS gemeldete verfügbare Kapazität; verborgener Speicherplatz ist die verbleibende Kapazität, die der Scan nicht sehen konnte, etwa bereinigbarer Speicher und lokale Schnappschüsse. Gilt sofort.";
 "Workspace" = "Arbeitsbereich";
 "Show Welcome Screen" = "Willkommensbildschirm anzeigen";
 "Restore Defaults" = "Standardwerte wiederherstellen";
@@ -233,6 +235,7 @@
 "macOS could not copy the path for %@." = "macOS konnte den Pfad für %@ nicht kopieren.";
 "The item at %@ is no longer available for Quick Look." = "Das Element unter %@ ist nicht mehr für die Übersicht verfügbar.";
 "Free Space" = "Freier Speicherplatz";
+"Hidden Space" = "Verborgener Speicherplatz";
 "just now" = "gerade eben";
 "Use colorblind-safe colors" = "Farbfehlsichtigkeitssichere Farben verwenden";
 "Swaps the file-kind and age colors for a palette that stays distinct with common color vision differences. Applies immediately." = "Ersetzt die Farben für Dateityp und Alter durch eine Palette, die bei gängigen Farbsehschwächen unterscheidbar bleibt. Wird sofort angewendet.";

@@ -35,6 +35,7 @@ struct SunburstPane: View {
            let rootNode = store.node(id: rootID) {
             let style = colorStyle
             let freeSpaceBytes = gatedFreeSpaceBytes
+            let hiddenSpaceBytes = gatedHiddenSpaceBytes
             let displayedFolder = displayedFolder(rootNode: rootNode, in: store)
             HStack(spacing: 0) {
                 SunburstChartView(
@@ -47,10 +48,12 @@ struct SunburstPane: View {
                     layoutID: Self.layoutID(
                         snapshotID: snapshot.id,
                         rootID: rootID,
-                        freeSpaceBytes: freeSpaceBytes
+                        freeSpaceBytes: freeSpaceBytes,
+                        hiddenSpaceBytes: hiddenSpaceBytes
                     ),
                     style: style,
                     freeSpaceBytes: freeSpaceBytes,
+                    hiddenSpaceBytes: hiddenSpaceBytes,
                     centerSizeText: NeodiskFormatters.size(displayedFolder.allocatedSize),
                     onHoverSegment: { handleHover($0) },
                     onClickSegment: { handleClick($0) },
@@ -126,6 +129,11 @@ struct SunburstPane: View {
         model.zoomRootID == nil ? model.freeSpaceBytes : nil
     }
 
+    /// Hidden space follows the exact same volume/zoom gates as free space.
+    private var gatedHiddenSpaceBytes: Int64? {
+        model.zoomRootID == nil ? model.hiddenSpaceBytes : nil
+    }
+
     private func selectedAncestorIDs(in store: FileTreeStore) -> Set<String> {
         guard let selectedNodeID = model.selectedNodeID,
               store.node(id: selectedNodeID) != nil else { return [] }
@@ -133,19 +141,22 @@ struct SunburstPane: View {
     }
 
     /// One string capturing every GEOMETRY input, so `.task(id:)` reloads on
-    /// any change: snapshot, root, depth, free space. Colors (tab mode,
-    /// highlight, palette, catalog) are deliberately absent — they restyle
-    /// the rendered layout in place (see SunburstChartModel.applyStyle).
+    /// any change: snapshot, root, depth, free space, hidden space. Colors
+    /// (tab mode, highlight, palette, catalog) are deliberately absent —
+    /// they restyle the rendered layout in place (see
+    /// SunburstChartModel.applyStyle).
     private static func layoutID(
         snapshotID: UUID,
         rootID: String,
-        freeSpaceBytes: Int64?
+        freeSpaceBytes: Int64?,
+        hiddenSpaceBytes: Int64?
     ) -> String {
         [
             snapshotID.uuidString,
             rootID,
             "\(depthLimit)",
-            "\(freeSpaceBytes ?? 0)"
+            "\(freeSpaceBytes ?? 0)",
+            "\(hiddenSpaceBytes ?? 0)"
         ].joined(separator: "|")
     }
 
@@ -158,10 +169,11 @@ struct SunburstPane: View {
             return
         }
 
-        if segment.isFreeSpace {
+        if segment.isFreeSpace || segment.isHiddenSpace {
             model.hoveredNodeID = nil
             model.hoveredAggregate = nil
-            model.hoveredCellIsFreeSpace = true
+            model.hoveredCellIsFreeSpace = segment.isFreeSpace
+            model.hoveredCellIsHiddenSpace = segment.isHiddenSpace
             setPreviewFolder(nil)
             return
         }
@@ -173,6 +185,7 @@ struct SunburstPane: View {
                 totalSize: segment.totalSize
             )
             model.hoveredCellIsFreeSpace = false
+            model.hoveredCellIsHiddenSpace = false
             // Preview the containing folder — its list holds the Smaller
             // Items row this segment pools, which highlights through the
             // hover state above.
@@ -183,6 +196,7 @@ struct SunburstPane: View {
         model.hoveredNodeID = segment.nodeID
         model.hoveredAggregate = nil
         model.hoveredCellIsFreeSpace = false
+        model.hoveredCellIsHiddenSpace = false
         // Hovering a directory previews its contents in the legend; files
         // (and childless folders, which have nothing to list) preview their
         // parent folder instead, so the legend shows the hovered item
@@ -221,6 +235,7 @@ struct SunburstPane: View {
         model.hoveredNodeID = nil
         model.hoveredAggregate = nil
         model.hoveredCellIsFreeSpace = false
+        model.hoveredCellIsHiddenSpace = false
     }
 
     /// Sunburst drills are pure navigation (DaisyDisk-style): a successful
@@ -242,7 +257,7 @@ struct SunburstPane: View {
             return
         }
 
-        if segment.isFreeSpace {
+        if segment.isFreeSpace || segment.isHiddenSpace {
             model.select(nil)
             return
         }
@@ -279,7 +294,7 @@ struct SunburstPane: View {
     /// is no select fallback — a refused or file-segment pinch does nothing,
     /// so an accidental pinch never moves the selection or opens Quick Look.
     private func handlePinchDrill(_ segment: SunburstSegment) {
-        guard !segment.isFreeSpace else { return }
+        guard !segment.isFreeSpace, !segment.isHiddenSpace else { return }
 
         let targetID = segment.isAggregate ? segment.parentFolderID : segment.nodeID
         guard let targetID,
@@ -304,6 +319,7 @@ struct SunburstPane: View {
             model.hoveredNodeID = nodeID
             model.hoveredAggregate = nil
             model.hoveredCellIsFreeSpace = false
+            model.hoveredCellIsHiddenSpace = false
             chartModel.setHoveredSegmentID(chartModel.segment(forNodeID: nodeID)?.id)
         case .aggregate:
             // Mirror hovering the aggregate segment itself: the status bar
@@ -314,11 +330,13 @@ struct SunburstPane: View {
                 totalSize: row.size
             )
             model.hoveredCellIsFreeSpace = false
+            model.hoveredCellIsHiddenSpace = false
             chartModel.setHoveredSegmentID(chartModel.segment(forSegmentID: row.id)?.id)
-        case .freeSpace:
+        case .freeSpace, .hiddenSpace:
             model.hoveredNodeID = nil
             model.hoveredAggregate = nil
-            model.hoveredCellIsFreeSpace = true
+            model.hoveredCellIsFreeSpace = row.target == .freeSpace
+            model.hoveredCellIsHiddenSpace = row.target == .hiddenSpace
             chartModel.setHoveredSegmentID(chartModel.segment(forSegmentID: row.id)?.id)
         }
     }
@@ -336,9 +354,10 @@ struct SunburstPane: View {
                     QuickLookPresenter.shared.openPreview(for: node)
                 }
             }
-        case .aggregate, .freeSpace:
-            // The aggregate's folder is already displayed and free space is
-            // not navigable — these rows are hover-highlight only.
+        case .aggregate, .freeSpace, .hiddenSpace:
+            // The aggregate's folder is already displayed and the synthetic
+            // free/hidden-space arcs are not navigable — these rows are
+            // hover-highlight only.
             break
         }
     }
