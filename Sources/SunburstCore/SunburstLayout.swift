@@ -329,7 +329,7 @@ public enum SunburstLayout {
     }
 
     private nonisolated static func rootColorBranchIDs(in treeStore: some SunburstTreeReading) -> [String] {
-        treeStore.children(of: treeStore.rootID).map(\.id)
+        treeStore.children(of: treeStore.rootID).map { $0.id }
     }
 
     /// The scan-root child a node descends from — the branch its hue family
