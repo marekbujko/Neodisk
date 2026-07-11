@@ -15,12 +15,13 @@ import SwiftUI
 import NeodiskKit
 
 /// One legend list row: a child of the displayed folder, the pooled
-/// "Smaller Items" aggregate, or the free-space arc.
+/// "Smaller Items" aggregate, or the synthetic free/hidden-space arcs.
 struct SunburstLegendRow: Identifiable, Equatable {
     enum Target: Equatable {
         case node(id: String, isDirectory: Bool)
         case aggregate
         case freeSpace
+        case hiddenSpace
     }
 
     let id: String
@@ -29,7 +30,8 @@ struct SunburstLegendRow: Identifiable, Equatable {
     let size: Int64
     /// The exact fill the chart draws (or would draw) for this entry.
     let dotColor: Color
-    /// Aggregate and free-space rows render muted, like their segments.
+    /// Aggregate and free/hidden-space rows render muted, like their
+    /// segments.
     let isDimmed: Bool
     /// Pooled item count; non-zero only on the aggregate row.
     let itemCount: Int
@@ -37,9 +39,10 @@ struct SunburstLegendRow: Identifiable, Equatable {
 
 enum SunburstLegend {
     /// The children of `displayedFolderID`, size-descending, followed by one
-    /// pooled "Smaller Items" row when the chart pooled some of them and a
-    /// "Free Space" row when the chart shows the free-space arc (only at the
-    /// chart root — free space belongs to the volume ring).
+    /// pooled "Smaller Items" row when the chart pooled some of them, then
+    /// "Hidden Space" and "Free Space" rows when the chart shows those arcs
+    /// (only at the chart root — both belong to the volume ring, in the
+    /// chart's angular order).
     ///
     /// Colors come from the rendered segments where the chart drew one; a
     /// child without a segment (its ring is beyond the depth limit) falls
@@ -55,6 +58,7 @@ enum SunburstLegend {
         var segmentByNodeID: [String: SunburstSegment] = [:]
         var aggregateSegment: SunburstSegment?
         var freeSpaceSegment: SunburstSegment?
+        var hiddenSpaceSegment: SunburstSegment?
         for segment in segments {
             if let nodeID = segment.nodeID {
                 segmentByNodeID[nodeID] = segment
@@ -62,6 +66,8 @@ enum SunburstLegend {
                 aggregateSegment = segment
             } else if segment.isFreeSpace {
                 freeSpaceSegment = segment
+            } else if segment.isHiddenSpace {
+                hiddenSpaceSegment = segment
             }
         }
 
@@ -112,6 +118,18 @@ enum SunburstLegend {
                 dotColor: SunburstChartStyler.baseStyle(for: aggregateSegment).fillColor,
                 isDimmed: true,
                 itemCount: aggregateSegment.itemCount
+            ))
+        }
+
+        if displayedFolderID == chartRootID, let hiddenSpaceSegment {
+            rows.append(SunburstLegendRow(
+                id: hiddenSpaceSegment.id,
+                target: .hiddenSpace,
+                label: NSLocalizedString("Hidden Space", comment: "Sunburst legend hidden-space row"),
+                size: hiddenSpaceSegment.totalSize,
+                dotColor: SunburstChartStyler.baseStyle(for: hiddenSpaceSegment).fillColor,
+                isDimmed: true,
+                itemCount: 0
             ))
         }
 

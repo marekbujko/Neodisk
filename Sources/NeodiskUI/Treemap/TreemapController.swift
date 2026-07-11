@@ -30,6 +30,7 @@ final class TreemapController {
         var highlight: TreemapHighlight?
         var expandedAggregateIDs: Set<String> = []
         var freeSpaceBytes: Int64?
+        var hiddenSpaceBytes: Int64?
         var palette: VizPalette = .standard
     }
 
@@ -62,6 +63,7 @@ final class TreemapController {
         highlight: TreemapHighlight? = nil,
         expandedAggregateIDs: Set<String>,
         freeSpaceBytes: Int64? = nil,
+        hiddenSpaceBytes: Int64? = nil,
         palette: VizPalette = .standard
     ) {
         let newInputs = Inputs(
@@ -72,6 +74,7 @@ final class TreemapController {
             highlight: highlight,
             expandedAggregateIDs: expandedAggregateIDs,
             freeSpaceBytes: freeSpaceBytes,
+            hiddenSpaceBytes: hiddenSpaceBytes,
             palette: palette
         )
         guard newInputs != inputs else { return }
@@ -134,17 +137,25 @@ final class TreemapController {
         model.hoveredNodeID = cell?.nodeID
         model.hoveredAggregate = cell?.aggregate
         model.hoveredCellIsFreeSpace = cell?.isFreeSpace == true
+        model.hoveredCellIsHiddenSpace = cell?.isHiddenSpace == true
     }
 
     func hoverEnded() {
         model?.hoveredNodeID = nil
         model?.hoveredAggregate = nil
         model?.hoveredCellIsFreeSpace = false
+        model?.hoveredCellIsHiddenSpace = false
     }
 
     func click(at point: CGPoint) {
         guard let model else { return }
         guard let cell = cell(at: point) else {
+            model.select(nil)
+            return
+        }
+        // The synthetic free/hidden-space cells represent no file; clicking
+        // them clears the selection (same as the sunburst's arcs).
+        if cell.isFreeSpace || cell.isHiddenSpace {
             model.select(nil)
             return
         }
@@ -275,9 +286,9 @@ final class TreemapController {
     /// anchor to move from.
     private func moveSelection(_ direction: MoveDirection) {
         guard let model, let scene else { return }
-        // Free-space and "smaller items" aggregate tiles aren't real files;
-        // navigate only among concrete file/folder tiles.
-        let tiles = scene.cells.filter { !$0.isFreeSpace && $0.aggregate == nil }
+        // Free-space, hidden-space, and "smaller items" aggregate tiles
+        // aren't real files; navigate only among concrete file/folder tiles.
+        let tiles = scene.cells.filter { !$0.isFreeSpace && !$0.isHiddenSpace && $0.aggregate == nil }
         guard !tiles.isEmpty else { return }
 
         guard let from = selectionRect.map({ CGPoint(x: $0.midX, y: $0.midY) }) else {
@@ -371,6 +382,7 @@ final class TreemapController {
         let highlight = inputs.highlight
         let expandedAggregateIDs = inputs.expandedAggregateIDs
         let freeSpaceBytes = inputs.freeSpaceBytes
+        let hiddenSpaceBytes = inputs.hiddenSpaceBytes
         let palette = inputs.palette
         let scale = view?.window?.backingScaleFactor ?? 2
         renderTask = Task { [weak self] in
@@ -387,6 +399,7 @@ final class TreemapController {
                     expandedAggregateIDs: expandedAggregateIDs,
                     viewport: viewport,
                     freeSpaceBytes: freeSpaceBytes,
+                    hiddenSpaceBytes: hiddenSpaceBytes,
                     palette: palette
                 )
                 guard !Task.isCancelled else { return nil }

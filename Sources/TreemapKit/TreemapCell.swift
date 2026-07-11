@@ -44,6 +44,11 @@ public struct TreemapCell: Sendable {
     /// Set when this cell is the synthetic free-space block for the volume
     /// root; `nodeID` is then a synthetic ID that exists in no tree store.
     public var isFreeSpace: Bool
+    /// Set when this cell is the synthetic hidden-space block for the volume
+    /// root (capacity the scan could not account for: purgeable space, local
+    /// snapshots, unreadable files); `nodeID` is then a synthetic ID that
+    /// exists in no tree store.
+    public var isHiddenSpace: Bool
 
     public struct AggregateInfo: Sendable {
         public let itemCount: Int
@@ -62,7 +67,8 @@ public struct TreemapCell: Sendable {
         surface: CushionSurface,
         isDirectory: Bool,
         aggregate: AggregateInfo? = nil,
-        isFreeSpace: Bool = false
+        isFreeSpace: Bool = false,
+        isHiddenSpace: Bool = false
     ) {
         self.nodeID = nodeID
         self.rect = rect
@@ -71,5 +77,6 @@ public struct TreemapCell: Sendable {
         self.isDirectory = isDirectory
         self.aggregate = aggregate
         self.isFreeSpace = isFreeSpace
+        self.isHiddenSpace = isHiddenSpace
     }
 }

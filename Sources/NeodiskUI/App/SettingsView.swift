@@ -114,7 +114,7 @@ private struct GeneralSettingsTab: View {
 
             Section("Visualization") {
                 Toggle("Show free space in visualizations", isOn: $preferences.showFreeSpace)
-                Text("Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately.")
+                Text("Free and hidden space appear only for volume scans. Free space uses macOS available capacity; hidden space is the remaining capacity the scan could not see, such as purgeable space and local snapshots. Applies immediately.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 

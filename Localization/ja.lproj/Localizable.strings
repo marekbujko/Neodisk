@@ -53,6 +53,8 @@
 
 /* MARK: - Status bar */
 "Free space on this volume" = "このボリュームの空き容量";
+"Hidden space on this volume" = "このボリュームの隠れた領域";
+"Purgeable space, local snapshots, and files the scan could not see." = "消去可能な領域、ローカルスナップショット、スキャンで確認できなかったファイルです。";
 "%@ smaller items in %@" = "%2$@内の小さい項目 %1$@個";
 "Hover the treemap or select a row to inspect an item." = "ツリーマップにポインタを合わせるか、行を選択して項目を確認できます。";
 
@@ -81,7 +83,7 @@
 "One pattern per line. Trailing “/” matches folders; “*” is a wildcard." = "1行につき1つのパターン。末尾の「/」はフォルダに一致し、「*」はワイルドカードです。";
 "Add Presets" = "プリセットを追加";
 "Show free space in visualizations" = "ビジュアライゼーションに空き容量を表示";
-"Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately." = "空き容量はボリュームのスキャン時にのみ表示され、macOSの利用可能容量を使用します。これには消去可能なAPFS領域が含まれる場合があります。すぐに適用されます。";
+"Free and hidden space appear only for volume scans. Free space uses macOS available capacity; hidden space is the remaining capacity the scan could not see, such as purgeable space and local snapshots. Applies immediately." = "空き容量と隠れた領域はボリュームのスキャン時にのみ表示されます。空き容量はmacOSの利用可能容量を使用し、隠れた領域は消去可能な領域やローカルスナップショットなど、スキャンで確認できなかった残りの容量です。すぐに適用されます。";
 "Workspace" = "ワークスペース";
 "Show Welcome Screen" = "ようこそ画面を表示";
 "Restore Defaults" = "初期設定に戻す";
@@ -234,6 +236,7 @@
 "macOS could not copy the path for %@." = "macOSは%@のパスをコピーできませんでした。";
 "The item at %@ is no longer available for Quick Look." = "%@の項目はクイックルックで利用できなくなりました。";
 "Free Space" = "空き容量";
+"Hidden Space" = "隠れた領域";
 "just now" = "たった今";
 "Use colorblind-safe colors" = "色覚に配慮した配色を使用";
 "Swaps the file-kind and age colors for a palette that stays distinct with common color vision differences. Applies immediately." = "ファイル種類と経過時間の色を、一般的な色覚特性でも区別しやすいパレットに切り替えます。すぐに適用されます。";

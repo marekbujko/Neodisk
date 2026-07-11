@@ -625,6 +625,21 @@ private struct StatusBar: View {
                     Text(NeodiskFormatters.size(freeSpaceBytes))
                         .monospacedDigit()
                 }
+            } else if model.hoveredCellIsHiddenSpace {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color(
+                        red: Double(TreemapScene.hiddenSpaceRGB.x),
+                        green: Double(TreemapScene.hiddenSpaceRGB.y),
+                        blue: Double(TreemapScene.hiddenSpaceRGB.z)
+                    ))
+                    .frame(width: 10, height: 10)
+                Text("Hidden space on this volume")
+                    .help("Purgeable space, local snapshots, and files the scan could not see.")
+                Spacer(minLength: 12)
+                if let hiddenSpaceBytes = model.hiddenSpaceBytes {
+                    Text(NeodiskFormatters.size(hiddenSpaceBytes))
+                        .monospacedDigit()
+                }
             } else if let aggregate = model.hoveredAggregate, let folder = model.hoveredNode {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(FileKindCatalog.otherColor)

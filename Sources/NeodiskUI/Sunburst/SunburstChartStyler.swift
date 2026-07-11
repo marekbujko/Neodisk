@@ -96,6 +96,11 @@ enum SunburstChartStyler {
         if segment.colorToken.role == .freeSpace {
             return Color(nsColor: .systemGray)
         }
+        if segment.colorToken.role == .hiddenSpace {
+            // Quieter than free space: the same neutral, but darker so the
+            // two synthetic arcs stay distinguishable at a glance.
+            return Color(nsColor: .darkGray)
+        }
         if segment.colorToken.role == .aggregate {
             return Color(nsColor: .tertiaryLabelColor)
         }
@@ -118,12 +123,18 @@ enum SunburstChartStyler {
         if segment.colorToken.role == .freeSpace {
             return 0.34
         }
+        if segment.colorToken.role == .hiddenSpace {
+            return 0.4
+        }
         return max(0.24, 0.78 - (depth * 0.09) - (segment.isAggregate ? 0.16 : 0))
     }
 
     private static func hoverFillOpacity(for segment: SunburstSegment) -> Double {
         if segment.colorToken.role == .freeSpace {
             return 0.5
+        }
+        if segment.colorToken.role == .hiddenSpace {
+            return 0.56
         }
         if segment.isAggregate {
             return 0.4

@@ -110,6 +110,10 @@ struct SunburstSegment: Identifiable, Hashable, Sendable {
     var isFreeSpace: Bool {
         colorToken.role == .freeSpace
     }
+
+    var isHiddenSpace: Bool {
+        colorToken.role == .hiddenSpace
+    }
 }
 
 enum SunburstLayout {
@@ -126,6 +130,8 @@ enum SunburstLayout {
     nonisolated static let angularSeam: CGFloat = 0.008
     /// The synthetic free-space segment's id; exists in no tree store.
     nonisolated static let freeSpaceSegmentID = "__sunburst-free-space__"
+    /// The synthetic hidden-space segment's id; exists in no tree store.
+    nonisolated static let hiddenSpaceSegmentID = "__sunburst-hidden-space__"
 
     typealias CancellationCheck = () throws -> Void
 
@@ -138,7 +144,8 @@ enum SunburstLayout {
         depthLimit: Int,
         minimumAngle: Double = .pi / 90,
         style: SunburstColorStyle = SunburstColorStyle(),
-        freeSpaceBytes: Int64? = nil
+        freeSpaceBytes: Int64? = nil,
+        hiddenSpaceBytes: Int64? = nil
     ) -> [SunburstSegment] {
         let unstyled = (try? segments(
             in: treeStore,
@@ -146,6 +153,7 @@ enum SunburstLayout {
             depthLimit: depthLimit,
             minimumAngle: minimumAngle,
             freeSpaceBytes: freeSpaceBytes,
+            hiddenSpaceBytes: hiddenSpaceBytes,
             cancellationCheck: {}
         )) ?? []
         return styled(unstyled, style: style, in: treeStore)
@@ -174,6 +182,7 @@ enum SunburstLayout {
         depthLimit: Int,
         minimumAngle: Double = .pi / 90,
         freeSpaceBytes: Int64? = nil,
+        hiddenSpaceBytes: Int64? = nil,
         cancellationCheck: CancellationCheck
     ) throws -> [SunburstSegment] {
         guard depthLimit > 0 else { return [] }
@@ -184,13 +193,15 @@ enum SunburstLayout {
         let visibleChildren = rootChildren.isEmpty ? [root] : rootChildren
         let ringStart = centerRadius
         let ringWidth = (0.98 - ringStart) / CGFloat(max(depthLimit, 1))
-        // Free space joins the root denominator so the allocated arcs shrink
-        // to make room; the child total floor keeps zero-byte children (each
-        // counted as at least one unit) from overflowing into the free arc.
+        // Free and hidden space join the root denominator so the allocated
+        // arcs shrink to make room; the child total floor keeps zero-byte
+        // children (each counted as at least one unit) from overflowing into
+        // the synthetic arcs.
         let freeBytes = max(freeSpaceBytes ?? 0, 0)
+        let hiddenBytes = max(hiddenSpaceBytes ?? 0, 0)
         let childUnitTotal = visibleChildren.reduce(Int64(0)) { $0 + max($1.allocatedSize, 1) }
         let allocatedDenominator = max(max(root.allocatedSize, Int64(visibleChildren.count)), childUnitTotal)
-        let denominator = allocatedDenominator + freeBytes
+        let denominator = allocatedDenominator + freeBytes + hiddenBytes
         let colorBranchContext = ColorBranchContext(rootChildIDs: rootColorBranchIDs(in: treeStore))
 
         var result: [SunburstSegment] = []
@@ -212,8 +223,25 @@ enum SunburstLayout {
             into: &result
         )
 
+        // Trailing synthetic arcs on the top ring: allocated … hidden, free.
+        let freeAngle = (.pi * 2) * (Double(freeBytes) / Double(denominator))
+        if hiddenBytes > 0 {
+            let hiddenAngle = (.pi * 2) * (Double(hiddenBytes) / Double(denominator))
+            result.append(SunburstSegment(
+                id: hiddenSpaceSegmentID,
+                nodeID: nil,
+                label: NSLocalizedString("Hidden Space", comment: "Sunburst hidden-space segment label"),
+                startAngle: .radians(.pi * 2 - freeAngle - hiddenAngle),
+                endAngle: .radians(.pi * 2 - freeAngle),
+                innerRadius: ringStart,
+                outerRadius: ringStart + ringWidth - ringGap,
+                depth: 0,
+                colorToken: .single(id: hiddenSpaceSegmentID, role: .hiddenSpace),
+                totalSize: hiddenBytes,
+                isAggregate: false
+            ))
+        }
         if freeBytes > 0 {
-            let freeAngle = (.pi * 2) * (Double(freeBytes) / Double(denominator))
             result.append(SunburstSegment(
                 id: freeSpaceSegmentID,
                 nodeID: nil,

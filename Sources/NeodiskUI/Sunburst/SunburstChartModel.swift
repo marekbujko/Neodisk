@@ -22,6 +22,7 @@ struct SunburstLayoutRequest: Sendable {
     let depthLimit: Int
     let style: SunburstColorStyle
     let freeSpaceBytes: Int64?
+    let hiddenSpaceBytes: Int64?
     /// Identity of this layout's geometry inputs; a changed id supersedes
     /// older loads.
     let layoutID: String
@@ -39,6 +40,7 @@ actor SunburstLayoutService: SunburstLayouting {
             rootID: request.rootID,
             depthLimit: request.depthLimit,
             freeSpaceBytes: request.freeSpaceBytes,
+            hiddenSpaceBytes: request.hiddenSpaceBytes,
             cancellationCheck: Task.checkCancellation
         )
     }

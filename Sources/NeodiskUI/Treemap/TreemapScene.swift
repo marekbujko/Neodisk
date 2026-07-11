@@ -52,6 +52,10 @@ struct TreemapScene: Sendable {
     /// Synthetic node representing volume free space, laid out as an extra
     /// child of the root; nil when the feature is off or not a volume scan.
     var freeSpaceNode: FileNodeRecord?
+    /// Synthetic node representing volume hidden space (purgeable space,
+    /// local snapshots, files the scan could not see), laid out like the
+    /// free-space node; nil when the feature is off or nothing is hidden.
+    var hiddenSpaceNode: FileNodeRecord?
     /// Coarse spatial buckets over `cells` so hover hit-testing doesn't
     /// linear-scan tens of thousands of cells per mouse-move.
     private let cellGrid: CellGrid
@@ -64,7 +68,8 @@ struct TreemapScene: Sendable {
         cells: [TreemapCell],
         labels: [CellLabel],
         expandedAggregateIDs: Set<String>,
-        freeSpaceNode: FileNodeRecord? = nil
+        freeSpaceNode: FileNodeRecord? = nil,
+        hiddenSpaceNode: FileNodeRecord? = nil
     ) {
         self.rootID = rootID
         self.size = size
@@ -74,6 +79,7 @@ struct TreemapScene: Sendable {
         self.labels = labels
         self.expandedAggregateIDs = expandedAggregateIDs
         self.freeSpaceNode = freeSpaceNode
+        self.hiddenSpaceNode = hiddenSpaceNode
         self.cellGrid = CellGrid(cells: cells, bounds: renderBounds)
     }
 
@@ -102,6 +108,11 @@ struct TreemapScene: Sendable {
     /// Suffix of the synthetic free-space node's id (root id + suffix).
     private nonisolated static let freeSpaceNodeSuffix = "/__free-space__"
     nonisolated static let freeSpaceRGB = SIMD3<Float>(0.13, 0.13, 0.16)
+    /// Suffix of the synthetic hidden-space node's id (root id + suffix).
+    private nonisolated static let hiddenSpaceNodeSuffix = "/__hidden-space__"
+    /// A lighter neutral than the near-black free-space cell, so the two
+    /// synthetic blocks read as related but distinct quiet areas.
+    nonisolated static let hiddenSpaceRGB = SIMD3<Float>(0.30, 0.30, 0.33)
 
     /// Kind-highlight dimming: non-matching cells blend this far toward
     /// their own gray (desaturation) and drop to this brightness, so the
@@ -127,6 +138,7 @@ struct TreemapScene: Sendable {
         expandedAggregateIDs: Set<String> = [],
         viewport: TreemapViewport = .identity,
         freeSpaceBytes: Int64? = nil,
+        hiddenSpaceBytes: Int64? = nil,
         palette: VizPalette = .standard
     ) -> TreemapScene {
         var cells: [TreemapCell] = []
@@ -141,6 +153,7 @@ struct TreemapScene: Sendable {
         }
 
         let freeSpaceNode = makeFreeSpaceNode(rootID: rootID, root: root, bytes: freeSpaceBytes)
+        let hiddenSpaceNode = makeHiddenSpaceNode(rootID: rootID, root: root, bytes: hiddenSpaceBytes)
 
         // The virtual canvas is size × scale, positioned so that emitted
         // geometry lands directly in view coordinates. Rasterization covers
@@ -175,8 +188,11 @@ struct TreemapScene: Sendable {
 
             if subdividable {
                 var children = store.children(of: node.id).filter { $0.allocatedSize > 0 }
-                if isRoot, let freeSpaceNode {
-                    children = FileTreeStore.sortedChildren(children + [freeSpaceNode])
+                if isRoot {
+                    let syntheticNodes = [freeSpaceNode, hiddenSpaceNode].compactMap { $0 }
+                    if !syntheticNodes.isEmpty {
+                        children = FileTreeStore.sortedChildren(children + syntheticNodes)
+                    }
                 }
                 if !children.isEmpty {
                     let childHeight = isRoot ? ridgeHeight : ridgeHeight * ridgeFalloff
@@ -227,9 +243,15 @@ struct TreemapScene: Sendable {
             }
 
             let isFreeSpace = node.id == freeSpaceNode?.id
-            var rgb = isFreeSpace
-                ? Self.freeSpaceRGB
-                : baseRGB(for: node, colorMode: colorMode, catalog: catalog, palette: palette)
+            let isHiddenSpace = node.id == hiddenSpaceNode?.id
+            var rgb: SIMD3<Float>
+            if isFreeSpace {
+                rgb = Self.freeSpaceRGB
+            } else if isHiddenSpace {
+                rgb = Self.hiddenSpaceRGB
+            } else {
+                rgb = baseRGB(for: node, colorMode: colorMode, catalog: catalog, palette: palette)
+            }
             // Plain directories never match a highlight (they are neither a
             // stats kind nor a countable age node), so undivided-directory
             // cells always dim — even when they contain matching files too
@@ -243,7 +265,8 @@ struct TreemapScene: Sendable {
                 rgb: rgb,
                 surface: surface,
                 isDirectory: node.isDirectory,
-                isFreeSpace: isFreeSpace
+                isFreeSpace: isFreeSpace,
+                isHiddenSpace: isHiddenSpace
             ))
 
             if !node.isDirectory {
@@ -261,7 +284,8 @@ struct TreemapScene: Sendable {
             rootID: rootID, size: size, viewport: viewport,
             renderBounds: renderBounds, cells: cells, labels: labels,
             expandedAggregateIDs: expandedAggregateIDs,
-            freeSpaceNode: freeSpaceNode
+            freeSpaceNode: freeSpaceNode,
+            hiddenSpaceNode: hiddenSpaceNode
         )
     }
 
@@ -312,11 +336,44 @@ struct TreemapScene: Sendable {
         root: FileNodeRecord,
         bytes: Int64?
     ) -> FileNodeRecord? {
+        makeSyntheticSpaceNode(
+            rootID: rootID,
+            root: root,
+            bytes: bytes,
+            idSuffix: freeSpaceNodeSuffix,
+            pathComponent: "__free-space__",
+            name: NSLocalizedString("Free Space", comment: "Synthetic treemap node for a volume's free space")
+        )
+    }
+
+    private nonisolated static func makeHiddenSpaceNode(
+        rootID: String,
+        root: FileNodeRecord,
+        bytes: Int64?
+    ) -> FileNodeRecord? {
+        makeSyntheticSpaceNode(
+            rootID: rootID,
+            root: root,
+            bytes: bytes,
+            idSuffix: hiddenSpaceNodeSuffix,
+            pathComponent: "__hidden-space__",
+            name: NSLocalizedString("Hidden Space", comment: "Synthetic treemap node for a volume's hidden space")
+        )
+    }
+
+    private nonisolated static func makeSyntheticSpaceNode(
+        rootID: String,
+        root: FileNodeRecord,
+        bytes: Int64?,
+        idSuffix: String,
+        pathComponent: String,
+        name: String
+    ) -> FileNodeRecord? {
         guard let bytes, bytes > 0 else { return nil }
         return FileNodeRecord(
-            id: rootID + freeSpaceNodeSuffix,
-            url: root.url.appending(path: "__free-space__"),
-            name: NSLocalizedString("Free Space", comment: "Synthetic treemap node for a volume's free space"),
+            id: rootID + idSuffix,
+            url: root.url.appending(path: pathComponent),
+            name: name,
             isDirectory: false,
             isSymbolicLink: false,
             allocatedSize: bytes,
@@ -421,10 +478,14 @@ struct TreemapScene: Sendable {
         )
         for (parent, child) in zip(chain, chain.dropFirst()) {
             var children = store.children(of: parent.id).filter { $0.allocatedSize > 0 }
-            if parent.id == rootID, let freeSpaceNode {
-                // Mirror the render path: free space participates in the
-                // root layout, shifting every sibling's rect.
-                children = FileTreeStore.sortedChildren(children + [freeSpaceNode])
+            if parent.id == rootID {
+                // Mirror the render path: the synthetic free/hidden-space
+                // nodes participate in the root layout, shifting every
+                // sibling's rect.
+                let syntheticNodes = [freeSpaceNode, hiddenSpaceNode].compactMap { $0 }
+                if !syntheticNodes.isEmpty {
+                    children = FileTreeStore.sortedChildren(children + syntheticNodes)
+                }
             }
             guard let childIndex = children.firstIndex(where: { $0.id == child.id }) else {
                 return nil

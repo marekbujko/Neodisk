@@ -53,6 +53,8 @@
 
 /* MARK: - 状态栏 */
 "Free space on this volume" = "此宗卷上的可用空间";
+"Hidden space on this volume" = "此宗卷上的隐藏空间";
+"Purgeable space, local snapshots, and files the scan could not see." = "可清除空间、本地快照以及扫描无法看到的文件。";
 "%@ smaller items in %@" = "%2$@ 中有 %1$@ 个较小项目";
 "Hover the treemap or select a row to inspect an item." = "将指针悬停在矩形树图上，或选择一行以查看项目详情。";
 
@@ -81,7 +83,7 @@
 "One pattern per line. Trailing “/” matches folders; “*” is a wildcard." = "每行一个模式。末尾加“/”表示匹配文件夹；“*”为通配符。";
 "Add Presets" = "添加预设";
 "Show free space in visualizations" = "在可视化视图中显示可用空间";
-"Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately." = "可用空间仅在扫描整个宗卷时显示，使用 macOS 报告的可用容量，其中可能包含可清除的 APFS 空间。更改立即生效。";
+"Free and hidden space appear only for volume scans. Free space uses macOS available capacity; hidden space is the remaining capacity the scan could not see, such as purgeable space and local snapshots. Applies immediately." = "可用空间和隐藏空间仅在扫描整个宗卷时显示。可用空间使用 macOS 报告的可用容量；隐藏空间是扫描无法看到的剩余容量，例如可清除空间和本地快照。更改立即生效。";
 "Workspace" = "工作区";
 "Show Welcome Screen" = "显示欢迎界面";
 "Restore Defaults" = "恢复默认设置";
@@ -234,6 +236,7 @@
 "macOS could not copy the path for %@." = "macOS 无法拷贝 %@ 的路径。";
 "The item at %@ is no longer available for Quick Look." = "位于 %@ 的项目已无法通过快速查看打开。";
 "Free Space" = "可用空间";
+"Hidden Space" = "隐藏空间";
 "just now" = "刚刚";
 "Use colorblind-safe colors" = "使用色盲友好配色";
 "Swaps the file-kind and age colors for a palette that stays distinct with common color vision differences. Applies immediately." = "将文件类型和文件时间的颜色替换为在常见色觉障碍下仍可区分的配色。立即生效。";

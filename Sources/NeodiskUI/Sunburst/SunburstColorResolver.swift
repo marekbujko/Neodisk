@@ -18,6 +18,9 @@ nonisolated enum SunburstColorRole: Hashable, Sendable {
     case file
     case aggregate
     case freeSpace
+    /// The volume's hidden space (purgeable space, snapshots, unreadable
+    /// files) — a quieter neutral than the free-space arc.
+    case hiddenSpace
 }
 
 nonisolated struct SunburstColorToken: Hashable, Sendable {
@@ -135,6 +138,8 @@ nonisolated enum SunburstColorResolver {
             return SunburstColorComponents(hue: 0, saturation: 0, brightness: 0.55)
         case .freeSpace:
             return SunburstColorComponents(hue: 0, saturation: 0, brightness: 0.62)
+        case .hiddenSpace:
+            return SunburstColorComponents(hue: 0, saturation: 0, brightness: 0.42)
         case .file:
             // Uniform gray with a slight brightness jitter so adjacent file
             // slices stay separable; depth darkens like the branch colors.

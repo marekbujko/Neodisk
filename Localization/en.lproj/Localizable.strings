@@ -53,6 +53,8 @@
 
 /* MARK: - Status bar */
 "Free space on this volume" = "Free space on this volume";
+"Hidden space on this volume" = "Hidden space on this volume";
+"Purgeable space, local snapshots, and files the scan could not see." = "Purgeable space, local snapshots, and files the scan could not see.";
 "%@ smaller items in %@" = "%@ smaller items in %@";
 "Hover the treemap or select a row to inspect an item." = "Hover the treemap or select a row to inspect an item.";
 
@@ -81,7 +83,7 @@
 "One pattern per line. Trailing “/” matches folders; “*” is a wildcard." = "One pattern per line. Trailing “/” matches folders; “*” is a wildcard.";
 "Add Presets" = "Add Presets";
 "Show free space in visualizations" = "Show free space in visualizations";
-"Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately." = "Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately.";
+"Free and hidden space appear only for volume scans. Free space uses macOS available capacity; hidden space is the remaining capacity the scan could not see, such as purgeable space and local snapshots. Applies immediately." = "Free and hidden space appear only for volume scans. Free space uses macOS available capacity; hidden space is the remaining capacity the scan could not see, such as purgeable space and local snapshots. Applies immediately.";
 "Workspace" = "Workspace";
 "Show Welcome Screen" = "Show Welcome Screen";
 "Restore Defaults" = "Restore Defaults";
@@ -234,6 +236,7 @@
 "macOS could not copy the path for %@." = "macOS could not copy the path for %@.";
 "The item at %@ is no longer available for Quick Look." = "The item at %@ is no longer available for Quick Look.";
 "Free Space" = "Free Space";
+"Hidden Space" = "Hidden Space";
 "just now" = "just now";
 "Use colorblind-safe colors" = "Use colorblind-safe colors";
 "Swaps the file-kind and age colors for a palette that stays distinct with common color vision differences. Applies immediately." = "Swaps the file-kind and age colors for a palette that stays distinct with common color vision differences. Applies immediately.";

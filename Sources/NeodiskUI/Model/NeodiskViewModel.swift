@@ -38,6 +38,9 @@ final class NeodiskViewModel {
     /// True while the cursor is over the synthetic free-space cell (whose
     /// node exists in no tree store).
     var hoveredCellIsFreeSpace = false
+    /// True while the cursor is over the synthetic hidden-space cell (whose
+    /// node exists in no tree store).
+    var hoveredCellIsHiddenSpace = false
     /// Node the treemap is currently zoomed into; nil means the snapshot root.
     var zoomRootID: String?
     /// Folders whose "smaller items" cell the user clicked open — their
@@ -167,6 +170,12 @@ final class NeodiskViewModel {
     /// Free space of the scanned volume, when the preference is on and the
     /// scan target is a volume; drawn as a synthetic treemap cell.
     var freeSpaceBytes: Int64?
+    /// DaisyDisk-style "hidden space" of the scanned volume: capacity that is
+    /// neither free nor accounted for by the finished scan (purgeable space,
+    /// local snapshots, files the scan could not read). Same gates as
+    /// `freeSpaceBytes`, plus a complete snapshot — mid-scan the unscanned
+    /// remainder is unknown, not hidden. Drawn as a synthetic cell/arc.
+    var hiddenSpaceBytes: Int64?
 
     /// Settings backing scan options and the free-space cell; assigned once
     /// by the app at launch.
@@ -654,9 +663,38 @@ final class NeodiskViewModel {
               let target = coordinator.selectedTarget,
               target.kind == .volume else {
             freeSpaceBytes = nil
+            hiddenSpaceBytes = nil
             return
         }
         freeSpaceBytes = SystemIntegration.volumeAvailableCapacityForImportantUsage(for: target.url)
+        // Hidden space needs a finished scan: a partial tree would misreport
+        // the not-yet-visited remainder as hidden.
+        let scannedBytes: Int64?
+        if let snapshot = coordinator.snapshot, snapshot.isComplete {
+            scannedBytes = snapshot.treeStore.root.allocatedSize
+        } else {
+            scannedBytes = nil
+        }
+        hiddenSpaceBytes = Self.hiddenSpaceBytes(
+            totalCapacity: SystemIntegration.volumeTotalCapacity(for: target.url),
+            availableCapacity: freeSpaceBytes,
+            scannedBytes: scannedBytes
+        )
+    }
+
+    /// DaisyDisk-style hidden space: total capacity minus available capacity
+    /// minus what the scan accounted for, clamped at zero (nil when any input
+    /// is missing or nothing remains). Uses the same available-capacity figure
+    /// as the free-space cell, so scanned + free + hidden tiles the volume
+    /// exactly instead of double-counting purgeable space.
+    nonisolated static func hiddenSpaceBytes(
+        totalCapacity: Int64?,
+        availableCapacity: Int64?,
+        scannedBytes: Int64?
+    ) -> Int64? {
+        guard let totalCapacity, let availableCapacity, let scannedBytes else { return nil }
+        let hidden = totalCapacity - availableCapacity - scannedBytes
+        return hidden > 0 ? hidden : nil
     }
 
     /// Stops the running scan, keeping any partial results on screen. The

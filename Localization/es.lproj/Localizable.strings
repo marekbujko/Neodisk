@@ -54,6 +54,8 @@
 
 /* MARK: - Barra de estado */
 "Free space on this volume" = "Espacio libre en este volumen";
+"Hidden space on this volume" = "Espacio oculto en este volumen";
+"Purgeable space, local snapshots, and files the scan could not see." = "Espacio purgable, instantáneas locales y archivos que el análisis no pudo ver.";
 "%@ smaller items in %@" = "%@ elementos más pequeños en %@";
 "Hover the treemap or select a row to inspect an item." = "Pasa el cursor por el mapa de árbol o selecciona una fila para inspeccionar un elemento.";
 
@@ -82,7 +84,7 @@
 "One pattern per line. Trailing “/” matches folders; “*” is a wildcard." = "Un patrón por línea. Una “/” al final coincide con carpetas; “*” es un comodín.";
 "Add Presets" = "Añadir preajustes";
 "Show free space in visualizations" = "Mostrar espacio libre en las visualizaciones";
-"Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately." = "El espacio libre solo aparece en análisis de volúmenes y usa la capacidad disponible de macOS, que puede incluir espacio purgable de APFS. Se aplica de inmediato.";
+"Free and hidden space appear only for volume scans. Free space uses macOS available capacity; hidden space is the remaining capacity the scan could not see, such as purgeable space and local snapshots. Applies immediately." = "El espacio libre y el espacio oculto solo aparecen en análisis de volúmenes. El espacio libre usa la capacidad disponible de macOS; el espacio oculto es la capacidad restante que el análisis no pudo ver, como espacio purgable e instantáneas locales. Se aplica de inmediato.";
 "Workspace" = "Espacio de trabajo";
 "Show Welcome Screen" = "Mostrar pantalla de bienvenida";
 "Restore Defaults" = "Restaurar valores predeterminados";
@@ -235,6 +237,7 @@
 "macOS could not copy the path for %@." = "macOS no pudo copiar la ruta de %@.";
 "The item at %@ is no longer available for Quick Look." = "El elemento en %@ ya no está disponible para Vista rápida.";
 "Free Space" = "Espacio libre";
+"Hidden Space" = "Espacio oculto";
 "just now" = "justo ahora";
 "Use colorblind-safe colors" = "Usar colores adaptados para daltonismo";
 "Swaps the file-kind and age colors for a palette that stays distinct with common color vision differences. Applies immediately." = "Cambia los colores de tipo de archivo y antigüedad por una paleta que se distingue con las deficiencias de visión del color más comunes. Se aplica de inmediato.";

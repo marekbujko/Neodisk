@@ -296,6 +296,51 @@ import NeodiskKit
         let segments = SunburstLayout.segments(in: store, rootID: "/root", depthLimit: 1)
 
         #expect(!segments.contains { $0.isFreeSpace })
+        #expect(!segments.contains { $0.isHiddenSpace })
+    }
+
+    // MARK: - Hidden space (Neodisk-specific)
+
+    @Test func hiddenSpaceAppendsOneTopRingSegmentBeforeFreeSpace() throws {
+        let children = [makeTestFileNode(id: "/root/a", name: "a", size: 200)]
+        let store = makeGeometryStore(children: children)
+
+        let segments = SunburstLayout.segments(
+            in: store, rootID: "/root", depthLimit: 3,
+            freeSpaceBytes: 100, hiddenSpaceBytes: 100
+        )
+        let fileSegment = try #require(segments.first { $0.nodeID == "/root/a" })
+        let hiddenSegment = try #require(segments.first { $0.isHiddenSpace })
+        let freeSegment = try #require(segments.first { $0.isFreeSpace })
+
+        // 200 allocated + 100 hidden + 100 free: half the circle for the
+        // file, then the hidden quarter, then the trailing free quarter —
+        // both synthetic arcs on the top ring, never recursed.
+        #expect(abs(fileSegment.endAngle.radians - .pi) < 0.0001)
+        #expect(abs(hiddenSegment.startAngle.radians - .pi) < 0.0001)
+        #expect(abs(hiddenSegment.endAngle.radians - .pi * 1.5) < 0.0001)
+        #expect(abs(freeSegment.startAngle.radians - .pi * 1.5) < 0.0001)
+        #expect(abs(freeSegment.endAngle.radians - .pi * 2) < 0.0001)
+        #expect(hiddenSegment.nodeID == nil)
+        #expect(hiddenSegment.depth == 0)
+        #expect(hiddenSegment.totalSize == 100)
+        #expect(hiddenSegment.colorToken.role == .hiddenSpace)
+        #expect(!hiddenSegment.isFreeSpace)
+        #expect(segments.count { $0.isHiddenSpace } == 1)
+    }
+
+    @Test func hiddenSpaceWithoutFreeSpaceFillsTheTrailingArc() throws {
+        let children = [makeTestFileNode(id: "/root/a", name: "a", size: 300)]
+        let store = makeGeometryStore(children: children)
+
+        let segments = SunburstLayout.segments(
+            in: store, rootID: "/root", depthLimit: 1, hiddenSpaceBytes: 100
+        )
+        let hiddenSegment = try #require(segments.first { $0.isHiddenSpace })
+
+        #expect(abs(hiddenSegment.startAngle.radians - .pi * 1.5) < 0.0001)
+        #expect(abs(hiddenSegment.endAngle.radians - .pi * 2) < 0.0001)
+        #expect(!segments.contains { $0.isFreeSpace })
     }
 
     // MARK: - Layout-time coloring (Neodisk-specific)

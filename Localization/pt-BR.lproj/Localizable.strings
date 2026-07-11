@@ -54,6 +54,8 @@
 
 /* MARK: - Status bar */
 "Free space on this volume" = "Espaço livre neste volume";
+"Hidden space on this volume" = "Espaço oculto neste volume";
+"Purgeable space, local snapshots, and files the scan could not see." = "Espaço descartável, snapshots locais e arquivos que a análise não pôde ver.";
 "%@ smaller items in %@" = "%@ itens menores em %@";
 "Hover the treemap or select a row to inspect an item." = "Passe o cursor sobre o treemap ou selecione uma linha para inspecionar um item.";
 
@@ -82,7 +84,7 @@
 "One pattern per line. Trailing “/” matches folders; “*” is a wildcard." = "Um padrão por linha. “/” no final corresponde a pastas; “*” é um curinga.";
 "Add Presets" = "Adicionar Predefinições";
 "Show free space in visualizations" = "Mostrar espaço livre nas visualizações";
-"Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately." = "O espaço livre aparece apenas para análises de volume e usa a capacidade disponível do macOS, que pode incluir espaço APFS descartável. Aplica-se imediatamente.";
+"Free and hidden space appear only for volume scans. Free space uses macOS available capacity; hidden space is the remaining capacity the scan could not see, such as purgeable space and local snapshots. Applies immediately." = "O espaço livre e o espaço oculto aparecem apenas para análises de volume. O espaço livre usa a capacidade disponível do macOS; o espaço oculto é a capacidade restante que a análise não pôde ver, como espaço descartável e snapshots locais. Aplica-se imediatamente.";
 "Workspace" = "Espaço de Trabalho";
 "Show Welcome Screen" = "Mostrar Tela de Boas-Vindas";
 "Restore Defaults" = "Restaurar Padrões";
@@ -235,6 +237,7 @@
 "macOS could not copy the path for %@." = "O macOS não conseguiu copiar o caminho de %@.";
 "The item at %@ is no longer available for Quick Look." = "O item em %@ não está mais disponível para a Visualização Rápida.";
 "Free Space" = "Espaço Livre";
+"Hidden Space" = "Espaço Oculto";
 "just now" = "agora mesmo";
 "Use colorblind-safe colors" = "Usar cores adaptadas para daltonismo";
 "Swaps the file-kind and age colors for a palette that stays distinct with common color vision differences. Applies immediately." = "Troca as cores de tipo de arquivo e idade por uma paleta que permanece distinta com as deficiências de visão de cores mais comuns. Aplicado imediatamente.";

@@ -36,9 +36,10 @@ struct TreemapPane: NSViewRepresentable {
             colorMode: model.treemapColorMode,
             highlight: model.treemapHighlight,
             expandedAggregateIDs: model.expandedAggregateIDs,
-            // Free space belongs to the volume as a whole; hide it once the
-            // user zooms into a subfolder.
+            // Free and hidden space belong to the volume as a whole; hide
+            // them once the user zooms into a subfolder.
             freeSpaceBytes: model.zoomRootID == nil ? model.freeSpaceBytes : nil,
+            hiddenSpaceBytes: model.zoomRootID == nil ? model.hiddenSpaceBytes : nil,
             palette: model.vizPalette
         )
         controller.setSelectedNode(model.selectedNodeID)

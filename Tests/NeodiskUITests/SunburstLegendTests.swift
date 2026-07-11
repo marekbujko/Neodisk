@@ -118,6 +118,60 @@ import NeodiskKit
         #expect(rows.map(\.id) == ["/root/sub/file"])
     }
 
+    // MARK: - Hidden space row
+
+    @Test func hiddenSpaceRowAppearsBeforeFreeSpaceOnlyWhenTheChartShowsTheArc() throws {
+        let children = [makeTestFileNode(id: "/root/a", name: "a", size: 300)]
+        let store = makeLegendStore(children: children)
+        let style = SunburstColorStyle()
+
+        let withHidden = SunburstLayout.segments(
+            in: store, rootID: "/root", depthLimit: 1,
+            freeSpaceBytes: 100, hiddenSpaceBytes: 50
+        )
+        let withoutHidden = SunburstLayout.segments(
+            in: store, rootID: "/root", depthLimit: 1, freeSpaceBytes: 100
+        )
+
+        let rowsWithHidden = SunburstLegend.rows(
+            forFolder: "/root", chartRootID: "/root", in: store, segments: withHidden, style: style
+        )
+        let rowsWithoutHidden = SunburstLegend.rows(
+            forFolder: "/root", chartRootID: "/root", in: store, segments: withoutHidden, style: style
+        )
+
+        // Chart order: children, then the hidden arc, then the trailing
+        // free arc.
+        #expect(rowsWithHidden.map(\.target) == [
+            .node(id: "/root/a", isDirectory: false), .hiddenSpace, .freeSpace,
+        ])
+        let hiddenRow = try #require(rowsWithHidden.first { $0.target == .hiddenSpace })
+        #expect(hiddenRow.size == 50)
+        #expect(hiddenRow.isDimmed)
+        #expect(!rowsWithoutHidden.contains { $0.target == .hiddenSpace })
+    }
+
+    @Test func hiddenSpaceRowIsOmittedWhenPreviewingASubfolder() throws {
+        let nested = makeTestFileNode(id: "/root/sub/file", name: "file", size: 50)
+        let sub = makeTestDirectoryNode(id: "/root/sub", name: "sub", children: [nested])
+        let root = makeTestDirectoryNode(id: "/root", name: "root", children: [sub])
+        let store = FileTreeStore(root: root, childrenByID: [
+            "/root": [sub],
+            "/root/sub": [nested],
+        ])
+        let segments = SunburstLayout.segments(
+            in: store, rootID: "/root", depthLimit: 3, hiddenSpaceBytes: 100
+        )
+        #expect(segments.contains { $0.isHiddenSpace })
+
+        let rows = SunburstLegend.rows(
+            forFolder: "/root/sub", chartRootID: "/root",
+            in: store, segments: segments, style: SunburstColorStyle()
+        )
+
+        #expect(rows.map(\.id) == ["/root/sub/file"])
+    }
+
     // MARK: - Fill agreement with the chart
 
     @Test func rowDotsUseTheRenderedSegmentFills() throws {

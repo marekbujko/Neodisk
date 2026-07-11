@@ -25,11 +25,12 @@ struct SunburstChartView: View {
     let selectedAncestorIDs: Set<String>
     let depthLimit: Int
     /// Identity of the layout's geometry inputs (snapshot, root, depth,
-    /// free space); changes reload the layout. Color changes restyle the
-    /// rendered segments instead (see the `style` onChange).
+    /// free space, hidden space); changes reload the layout. Color changes
+    /// restyle the rendered segments instead (see the `style` onChange).
     let layoutID: String
     let style: SunburstColorStyle
     let freeSpaceBytes: Int64?
+    let hiddenSpaceBytes: Int64?
     /// Formatted total size of the displayed folder, shown in the center
     /// hole (the hover-preview folder while the chart hovers a directory).
     let centerSizeText: String
@@ -90,6 +91,7 @@ struct SunburstChartView: View {
                         depthLimit: depthLimit,
                         style: style,
                         freeSpaceBytes: freeSpaceBytes,
+                        hiddenSpaceBytes: hiddenSpaceBytes,
                         layoutID: layoutID
                     ))
                 }
@@ -298,10 +300,11 @@ struct SunburstChartView: View {
             return
         }
 
-        // layoutID is "snapshot|root|depth|freeSpace" (see SunburstPane).
+        // layoutID is "snapshot|root|depth|freeSpace|hiddenSpace" (see
+        // SunburstPane).
         let previousParts = fromLayoutID.split(separator: "|", omittingEmptySubsequences: false)
         let nextParts = toLayoutID.split(separator: "|", omittingEmptySubsequences: false)
-        guard previousParts.count == 4, nextParts.count == 4,
+        guard previousParts.count == 5, nextParts.count == 5,
               previousParts[0] == nextParts[0],
               previousParts[1] != nextParts[1] else {
             zoomTransition = nil

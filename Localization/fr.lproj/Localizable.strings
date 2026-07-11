@@ -53,6 +53,8 @@
 
 /* MARK: - Status bar */
 "Free space on this volume" = "Espace libre sur ce volume";
+"Hidden space on this volume" = "Espace masqué sur ce volume";
+"Purgeable space, local snapshots, and files the scan could not see." = "Espace purgeable, instantanés locaux et fichiers que l'analyse n'a pas pu voir.";
 "%@ smaller items in %@" = "%@ éléments plus petits dans %@";
 "Hover the treemap or select a row to inspect an item." = "Survolez la carte proportionnelle ou sélectionnez une ligne pour inspecter un élément.";
 
@@ -81,7 +83,7 @@
 "One pattern per line. Trailing “/” matches folders; “*” is a wildcard." = "Un motif par ligne. Un « / » final cible les dossiers ; « * » est un caractère générique.";
 "Add Presets" = "Ajouter des préréglages";
 "Show free space in visualizations" = "Afficher l'espace libre dans les visualisations";
-"Free space appears only for volume scans and uses macOS available capacity, which can include purgeable APFS space. Applies immediately." = "L'espace libre n'apparaît que pour les analyses de volume et utilise la capacité disponible de macOS, qui peut inclure de l'espace APFS purgeable. S'applique immédiatement.";
+"Free and hidden space appear only for volume scans. Free space uses macOS available capacity; hidden space is the remaining capacity the scan could not see, such as purgeable space and local snapshots. Applies immediately." = "L'espace libre et l'espace masqué n'apparaissent que pour les analyses de volume. L'espace libre utilise la capacité disponible de macOS ; l'espace masqué est la capacité restante que l'analyse n'a pas pu voir, comme l'espace purgeable et les instantanés locaux. S'applique immédiatement.";
 "Workspace" = "Espace de travail";
 "Show Welcome Screen" = "Afficher l'écran d'accueil";
 "Restore Defaults" = "Rétablir les réglages par défaut";
@@ -234,6 +236,7 @@
 "macOS could not copy the path for %@." = "macOS n'a pas pu copier le chemin de %@.";
 "The item at %@ is no longer available for Quick Look." = "L'élément à %@ n'est plus disponible pour Coup d'œil.";
 "Free Space" = "Espace libre";
+"Hidden Space" = "Espace masqué";
 "just now" = "à l'instant";
 </content>
 "Use colorblind-safe colors" = "Utiliser des couleurs adaptées au daltonisme";
