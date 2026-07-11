@@ -36,8 +36,10 @@ public struct NeodiskApp: App {
         }
         .commands {
             CommandGroup(after: .appInfo) {
-                Button("Check for Updates…") {
+                Button {
                     updates.checkForUpdates()
+                } label: {
+                    Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
                 }
                 .disabled(!updates.canCheckForUpdates)
             }
