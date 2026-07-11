@@ -53,7 +53,11 @@ Delete and clean up safely in Finder instead.
 - Arrow keys move the selection in both the treemap and the sunburst
 - Drill into a folder with `⌘↓`, drill back out with `⌘↑`, or click folders in the breadcrumb bar
 - Snapshots, completed scans persist and reopen instantly
-- Changes (+/-) toggle diffs against the previous scan to show what files grew, shrinked, got added, deleted
+- Changes tab lists what got added, deleted, renamed, grew or shrank since the previous scan, with inode-based rename detection
+- Show Package Contents: apps and bundles stay solid like in Finder until you expand them
+- Free and hidden space for volume scans (always in the sunburst, optional in the treemap)
+- Sidebar volumes show a kind-colored usage bar, and local cloud files (iCloud Drive, Google Drive, Dropbox) get their own section
+- Auto-updates via Sparkle
 - Multilingual: UI follows macOS system language: English, Spanish, French, German, Italian, Brazilian Portuguese, Japanese, and Simplified Chinese
 
 ## Build & Run
