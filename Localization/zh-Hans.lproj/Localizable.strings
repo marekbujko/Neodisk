@@ -13,9 +13,6 @@
 "Rescan" = "重新扫描";
 "Scan %@ again" = "再次扫描 %@";
 "Changes" = "变化";
-"Loading the previous scan…" = "正在加载上次扫描…";
-"Hide changes since the previous scan" = "隐藏自上次扫描以来的变化";
-"Show what grew since the previous scan" = "显示自上次扫描以来增长的内容";
 "Statistics" = "统计";
 "Hide the statistics panel" = "隐藏统计面板";
 "Show the statistics panel" = "显示统计面板";
@@ -269,7 +266,6 @@
 "Disk usage chart" = "磁盘使用情况图表";
 "Click a folder segment to open it. Click a file segment to select it." = "点按文件夹扇区以打开它。点按文件扇区以选择它。";
 "Click a folder segment to open it. Click a file segment to select it. Click the center to go up." = "点按文件夹扇区以打开它。点按文件扇区以选择它。点按中心以返回上层。";
-"Changes are shown in the treemap view" = "更改会显示在矩形树图视图中";
 
 /* MARK: - Updates (Sparkle) */
 "Check for Updates…" = "检查更新…";

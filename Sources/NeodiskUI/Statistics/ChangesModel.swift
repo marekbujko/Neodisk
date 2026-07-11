@@ -6,7 +6,7 @@
 //  renamed / grown / shrunk list of the displayed scan against its
 //  predecessor. Owned by NeodiskViewModel as `model.changes`.
 //
-//  Availability mirrors the Changes toolbar toggle's baseline gating (see
+//  Availability mirrors the outline diff's baseline gating (see
 //  DiffModel.canShow): a complete, persistable snapshot on screen and a
 //  rotated previous snapshot on disk. The list is computed on demand when
 //  the tab is visible — it needs the full previous snapshot (real paths for
@@ -51,7 +51,7 @@ final class ChangesModel {
         self.snapshotCache = snapshotCache
     }
 
-    /// Same gate as the Changes toolbar toggle: the diff exists only when a
+    /// Same gate as the outline's Δ column: the diff exists only when a
     /// baseline (previous snapshot) is available for the displayed target.
     var canCompare: Bool {
         model?.diff.canShow == true
@@ -100,7 +100,7 @@ final class ChangesModel {
                 self.comparisonDate = previous?.finishedAt
             } else {
                 // Corrupt or vanished predecessor: reflect it so the gate
-                // (and the toolbar toggle) disable together.
+                // (and the outline's Δ column) disable together.
                 self.list = nil
                 self.comparisonDate = nil
                 self.loadedSnapshotID = nil

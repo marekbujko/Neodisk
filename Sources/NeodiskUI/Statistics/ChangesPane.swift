@@ -7,7 +7,7 @@
 //  biggest disk movement first. Rows are the shared read-only navigation —
 //  clicking selects the node in the outline and treemap; deleted entries
 //  (whose node no longer exists) select the nearest surviving ancestor
-//  instead. Availability mirrors the Changes toolbar toggle: no list
+//  instead. Availability mirrors the outline diff: no list
 //  without a previous snapshot to compare against.
 //
 

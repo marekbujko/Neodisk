@@ -13,9 +13,6 @@
 "Rescan" = "Rescan";
 "Scan %@ again" = "Scan %@ again";
 "Changes" = "Changes";
-"Loading the previous scan…" = "Loading the previous scan…";
-"Hide changes since the previous scan" = "Hide changes since the previous scan";
-"Show what grew since the previous scan" = "Show what grew since the previous scan";
 "Statistics" = "Statistics";
 "Hide the statistics panel" = "Hide the statistics panel";
 "Show the statistics panel" = "Show the statistics panel";
@@ -269,7 +266,6 @@
 "Disk usage chart" = "Disk usage chart";
 "Click a folder segment to open it. Click a file segment to select it." = "Click a folder segment to open it. Click a file segment to select it.";
 "Click a folder segment to open it. Click a file segment to select it. Click the center to go up." = "Click a folder segment to open it. Click a file segment to select it. Click the center to go up.";
-"Changes are shown in the treemap view" = "Changes are shown in the treemap view";
 
 /* MARK: - Updates (Sparkle) */
 "Check for Updates…" = "Check for Updates…";

@@ -13,9 +13,6 @@
 "Rescan" = "再スキャン";
 "Scan %@ again" = "%@を再スキャン";
 "Changes" = "変更";
-"Loading the previous scan…" = "前回のスキャンを読み込み中…";
-"Hide changes since the previous scan" = "前回のスキャン以降の変更を隠す";
-"Show what grew since the previous scan" = "前回のスキャン以降に増えた項目を表示";
 "Statistics" = "統計";
 "Hide the statistics panel" = "統計パネルを隠す";
 "Show the statistics panel" = "統計パネルを表示";
@@ -269,7 +266,6 @@
 "Disk usage chart" = "ディスク使用状況のチャート";
 "Click a folder segment to open it. Click a file segment to select it." = "フォルダのセグメントをクリックすると開きます。ファイルのセグメントをクリックすると選択します。";
 "Click a folder segment to open it. Click a file segment to select it. Click the center to go up." = "フォルダのセグメントをクリックすると開きます。ファイルのセグメントをクリックすると選択します。中心をクリックすると上の階層に移動します。";
-"Changes are shown in the treemap view" = "変更はツリーマップ表示に表示されます";
 
 /* MARK: - Updates (Sparkle) */
 "Check for Updates…" = "アップデートを確認…";

@@ -3,18 +3,20 @@
 //  Neodisk
 //
 //  "Changes since last scan" state: the per-node size baseline decoded from
-//  the previous snapshot, plus the toggle/loading choreography. Owned by
-//  NeodiskViewModel as `model.diff`.
+//  the previous snapshot, plus the show/hide loading choreography. Owned by
+//  NeodiskViewModel as `model.diff`. Visibility is driven by the statistics
+//  panel's Changes tab (see NeodiskViewModel.wantsDiffVisible): selecting
+//  the tab shows the outline's Δ column, leaving it hides it.
 //
-//  The baseline usually loads before the toggle is pressed: whenever a
+//  The baseline usually loads before the tab is opened: whenever a
 //  complete tree lands on screen — a scan finishing (its predecessor
 //  rotating into the previous slot) or a saved snapshot opening without a
 //  rescan — the "prepare Changes" preference prefetches the baseline in
-//  the background so the toggle responds instantly. That prefetch decodes
+//  the background so the tab responds instantly. That prefetch decodes
 //  the whole previous snapshot (~1s of CPU on a big volume), so it waits a
 //  few seconds at low priority to let the first paint's kind catalog and
-//  treemap win the cores; a user toggle during the wait loads the baseline
-//  immediately instead of waiting out the delay.
+//  treemap win the cores; opening the tab during the wait loads the
+//  baseline immediately instead of waiting out the delay.
 //
 
 import Foundation
@@ -75,13 +77,16 @@ final class DiffModel {
         return model?.cachedScanInfo[snapshot.target.id]?.hasPreviousSnapshot == true
     }
 
-    func toggle() {
-        if baseline != nil {
+    /// Shows or hides the diff. Idempotent: the model resyncs on every tab
+    /// or panel change, so repeated calls with the same value are no-ops.
+    func setShowing(_ shouldShow: Bool) {
+        if !shouldShow {
             baseline = nil
-            // An in-flight reload must not resurrect the mode it just left.
+            // An in-flight load must not resurrect the mode it just left.
             showsWhenLoaded = false
             return
         }
+        guard baseline == nil else { return }
         guard canShow, let target = coordinator.snapshot?.target else { return }
         if let prefetchedBaseline, prefetchedBaseline.targetID == target.id {
             baseline = prefetchedBaseline
@@ -111,33 +116,39 @@ final class DiffModel {
 
     /// Saving the displayed snapshot rotated its predecessor. A baseline on
     /// screen now compares against the wrong generation, so rebase it; with
-    /// diff mode off, prefetch the fresh previous snapshot instead when the
-    /// preference asks for that. Either path needs two scans of this target
-    /// on disk — after its first ever scan `canShow` is false and nothing
-    /// loads, so the toggle simply stays disabled.
+    /// the Changes tab away, prefetch the fresh previous snapshot instead
+    /// when the preference asks for that. Either path needs two scans of
+    /// this target on disk — after its first ever scan `canShow` is false
+    /// and nothing loads, so the tab simply has nothing to show.
     func snapshotWasRotated(for target: ScanTarget) {
         guard coordinator.snapshot?.target.id == target.id else { return }
         prefetchedBaseline = nil
-        if baseline?.targetID == target.id {
-            // Diff is on screen against the now-stale predecessor: rebase it
-            // right away, not after the prefetch delay.
+        guard canShow else { return }
+        if model?.wantsDiffVisible == true {
+            // The Changes tab is on screen: rebase (or first-load) against
+            // the fresh predecessor right away, not after the prefetch
+            // delay. `load` bumps the generation, dropping any stale decode.
             load(for: target, showsOnCompletion: true)
-        } else if canShow, model?.preferences?.prepareChangesAfterScan ?? true {
+        } else if model?.preferences?.prepareChangesAfterScan ?? true {
             schedulePrefetch(for: target)
         }
     }
 
     /// A saved snapshot was put on screen without a rescan, so no scan
-    /// finish will prefetch for it. Same convenience as after a rotation:
-    /// with the preference on, load the baseline so the toggle answers
-    /// instantly. `snapshotDidChange` already ran for the restored snapshot,
-    /// so there is no stale prefetch or in-flight load to worry about.
+    /// finish will prefetch for it. With the Changes tab on screen the
+    /// baseline loads (and shows) right away; otherwise, with the
+    /// preference on, prefetch so the tab answers instantly later.
+    /// `snapshotDidChange` already ran for the restored snapshot, so there
+    /// is no stale prefetch or in-flight load to worry about.
     func snapshotWasRestored(for target: ScanTarget) {
         guard coordinator.snapshot?.target.id == target.id,
-              baseline == nil, !isLoading,
-              prefetchedBaseline?.targetID != target.id,
-              canShow, model?.preferences?.prepareChangesAfterScan ?? true else { return }
-        schedulePrefetch(for: target)
+              baseline == nil, !isLoading, canShow else { return }
+        if model?.wantsDiffVisible == true {
+            load(for: target, showsOnCompletion: true)
+        } else if prefetchedBaseline?.targetID != target.id,
+                  model?.preferences?.prepareChangesAfterScan ?? true {
+            schedulePrefetch(for: target)
+        }
     }
 
     /// Defers a restore/rotate baseline prefetch by `prefetchDelay` and runs

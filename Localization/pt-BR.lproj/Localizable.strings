@@ -14,9 +14,6 @@
 "Rescan" = "Analisar novamente";
 "Scan %@ again" = "Analisar %@ novamente";
 "Changes" = "Alterações";
-"Loading the previous scan…" = "Carregando a análise anterior…";
-"Hide changes since the previous scan" = "Ocultar alterações desde a análise anterior";
-"Show what grew since the previous scan" = "Mostrar o que cresceu desde a análise anterior";
 "Statistics" = "Estatísticas";
 "Hide the statistics panel" = "Ocultar o painel de estatísticas";
 "Show the statistics panel" = "Mostrar o painel de estatísticas";
@@ -270,7 +267,6 @@
 "Disk usage chart" = "Gráfico de uso do disco";
 "Click a folder segment to open it. Click a file segment to select it." = "Clique em um segmento de pasta para abri-la. Clique em um segmento de arquivo para selecioná-lo.";
 "Click a folder segment to open it. Click a file segment to select it. Click the center to go up." = "Clique em um segmento de pasta para abri-la. Clique em um segmento de arquivo para selecioná-lo. Clique no centro para subir.";
-"Changes are shown in the treemap view" = "As alterações são mostradas na visualização de treemap";
 
 /* MARK: - Updates (Sparkle) */
 "Check for Updates…" = "Verificar Atualizações…";

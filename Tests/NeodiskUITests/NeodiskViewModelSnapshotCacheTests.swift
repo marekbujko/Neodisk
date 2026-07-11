@@ -215,7 +215,8 @@ import NeodiskKit
         }
 
         #expect(model.diff.canShow)
-        model.diff.toggle()
+        // Opening the Changes tab drives the diff on (no toolbar toggle).
+        model.analysisTab = .changes
         try await waitUntilAsync("baseline loaded") {
             model.diff.baseline != nil
         }
@@ -226,8 +227,22 @@ import NeodiskKit
         let displayedFile = try #require(model.store?.node(id: fileID))
         #expect(baseline.sizeDelta(for: displayedFile) == 15)
 
-        model.diff.toggle()
+        // Leaving the tab hides the diff again.
+        model.analysisTab = .largest
         #expect(model.diff.baseline == nil)
+
+        // Hiding the statistics panel while on the tab hides it too, and
+        // showing the panel again brings it straight back (prefetched).
+        model.analysisTab = .changes
+        try await waitUntilAsync("baseline reshown") {
+            model.diff.baseline != nil
+        }
+        model.showKindStats = false
+        #expect(model.diff.baseline == nil)
+        model.showKindStats = true
+        try await waitUntilAsync("baseline back with the panel") {
+            model.diff.baseline != nil
+        }
     }
 
     @Test func testDiffBaselinePrefetchesAfterSecondScanAndTogglesInstantly() async throws {
@@ -269,9 +284,9 @@ import NeodiskKit
         #expect(!model.diff.isLoading)
         #expect(!model.diff.isShowing)
 
-        // The toggle must not need another load: the baseline shows
+        // Opening the tab must not need another load: the baseline shows
         // synchronously and carries the previous scan's sizes.
-        model.diff.toggle()
+        model.diff.setShowing(true)
         let baseline = try #require(model.diff.baseline)
         #expect(baseline.allocatedSize(forNodeID: target.id + "/file.txt") == 10)
     }
@@ -348,9 +363,9 @@ import NeodiskKit
         }
         #expect(!model.diff.isShowing)
 
-        // The toggle must not need another load: the baseline shows
+        // Opening the tab must not need another load: the baseline shows
         // synchronously and carries the previous scan's sizes.
-        model.diff.toggle()
+        model.diff.setShowing(true)
         let baseline = try #require(model.diff.baseline)
         #expect(baseline.allocatedSize(forNodeID: target.id + "/file.txt") == 10)
     }

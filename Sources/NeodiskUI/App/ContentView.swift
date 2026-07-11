@@ -179,40 +179,6 @@ public struct ContentView: View {
                 .help("Scan \(model.coordinator.selectedTarget?.displayName ?? "this location") again")
             }
 
-            Toggle(isOn: Binding(
-                get: { model.diff.isShowing },
-                set: { _ in model.diff.toggle() }
-            )) {
-                // Decoding a big previous snapshot takes a couple of
-                // seconds; a real spinner takes the symbol's place while
-                // that runs. Both views stay mounted with opacity doing
-                // the swap: an if/else here changes the toolbar item's
-                // structure, which splits the shared capsule apart. And
-                // toggleScanDiff already ignores clicks during the load,
-                // so no disabling either.
-                ZStack {
-                    Label("Changes", systemImage: "plus.forwardslash.minus")
-                        .opacity(model.diff.isLoading ? 0 : 1)
-                    ProgressView()
-                        .controlSize(.small)
-                        .opacity(model.diff.isLoading ? 1 : 0)
-                }
-            }
-            .toggleStyle(.button)
-            // The diff renders in the outline pane, which sunburst hides —
-            // the toggle stays put (persistent toolbar) but disables there.
-            .disabled(
-                model.vizViewMode == .sunburst
-                    || (!model.diff.canShow && !model.diff.isShowing)
-            )
-            .help(model.vizViewMode == .sunburst
-                ? "Changes are shown in the treemap view"
-                : model.diff.isLoading
-                    ? "Loading the previous scan…"
-                    : model.diff.isShowing
-                        ? "Hide changes since the previous scan"
-                        : "Show what grew since the previous scan")
-
             Button {
                 model.showKindStats.toggle()
             } label: {

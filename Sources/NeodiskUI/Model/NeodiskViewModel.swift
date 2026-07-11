@@ -46,29 +46,26 @@ final class NeodiskViewModel {
     /// Folders whose "smaller items" cell the user clicked open — their
     /// children render individually even when tiny.
     var expandedAggregateIDs: Set<String> = []
-    var showKindStats = true
+    var showKindStats = true {
+        didSet { syncDiffVisibility() }
+    }
     /// Which statistics-panel tab is active. Also decides what treemap color
     /// means (Age colors by modification date; the others keep kind colors)
     /// and which drill-in highlight reaches the map — see treemapColorMode /
     /// treemapHighlight. Deliberately not reset per scan: the chosen lens
     /// carries across locations. Starts on Largest — the first tab, and the
     /// first question a disk tool gets asked.
-    var analysisTab: AnalysisTab = .largest
+    var analysisTab: AnalysisTab = .largest {
+        didSet { syncDiffVisibility() }
+    }
     /// Locations sidebar visibility; lives here so the View menu can toggle
     /// it. Always starts visible.
     var sidebarVisibility = NavigationSplitViewVisibility.all
     /// Which visualization the center pane shows (treemap or sunburst).
     /// Preference mirroring happens where the toolbar switcher binds.
-    var vizViewMode: VizViewMode = .treemap {
-        didSet {
-            // The diff's visual surface (the outline's delta column) is
-            // hidden in sunburst and its toolbar toggle is disabled there —
-            // leaving the mode on would strand it behind a dead button.
-            if vizViewMode == .sunburst, oldValue != .sunburst, diff.isShowing {
-                diff.toggle()
-            }
-        }
-    }
+    /// The diff stays armed across the switch: sunburst has no Δ column to
+    /// render, but switching back to the treemap must not lose the mode.
+    var vizViewMode: VizViewMode = .treemap
 
     // MARK: Kind statistics
 
@@ -171,8 +168,21 @@ final class NeodiskViewModel {
         let lastScanDuration: TimeInterval?
     }
 
-    /// "Changes since last scan" baseline and toggle; see DiffModel.
+    /// "Changes since last scan" baseline; see DiffModel. Visibility is
+    /// driven by the Changes tab (`wantsDiffVisible`), not a toolbar toggle.
     let diff: DiffModel
+
+    /// The Changes tab owns the diff display: while it is the active tab of
+    /// a visible statistics panel, the outline shows its Δ column (and the
+    /// tab its list). Hiding the panel or switching tabs turns both off —
+    /// the same contract the sunburst uses for tab-driven coloring.
+    var wantsDiffVisible: Bool {
+        showKindStats && analysisTab == .changes
+    }
+
+    private func syncDiffVisibility() {
+        diff.setShowing(wantsDiffVisible)
+    }
     /// Free space of the scanned volume, when the preference is on and the
     /// scan target is a volume; drawn as a synthetic treemap cell.
     var freeSpaceBytes: Int64?
