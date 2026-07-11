@@ -471,6 +471,7 @@ final class NeodiskViewModel {
                     for: cached,
                     in: snapshotCache
                 )
+                self.kindStatsSidecarGeneration += 1
             } else {
                 // Corrupt or vanished: forget the cache entry and scan live.
                 self.cachedScanInfo.removeValue(forKey: target.id)
@@ -503,6 +504,13 @@ final class NeodiskViewModel {
         await snapshotCache.loadAuxiliaryData(forTargetID: targetID)
             .flatMap(KindStatsSidecar.decoding)
     }
+
+    /// Bumped whenever a kind-stats sidecar lands on disk. The sidecar is
+    /// written asynchronously AFTER the snapshot save updates
+    /// `cachedScanInfo` (it is an O(nodes) classification pass), so anyone
+    /// reading sidecars reactively — the sidebar's volume bars — must key
+    /// on this, not on the scan date, or they reload too early and miss it.
+    private(set) var kindStatsSidecarGeneration = 0
 
     /// Snapshots cached before sidecars existed (or whose sidecar went
     /// stale) get one after display, so their next restore is seeded. Only
@@ -594,6 +602,7 @@ final class NeodiskViewModel {
                         for: cached,
                         in: snapshotCache
                     )
+                    self.kindStatsSidecarGeneration += 1
                 } else if self.coordinator.isScanning, self.coordinator.snapshot?.id == cached.id {
                     FileHandle.standardError.write(
                         Data("Neodisk: showing cached scan of \(target.id) while the refresh runs\n".utf8)
@@ -664,6 +673,7 @@ final class NeodiskViewModel {
                 // Kind stats ride along so the next restore of this
                 // snapshot starts with a colored map.
                 await Self.saveKindStatsSidecar(for: snapshot, in: snapshotCache)
+                self?.kindStatsSidecarGeneration += 1
             } catch {
                 FileHandle.standardError.write(
                     Data("Neodisk: failed to persist scan snapshot: \(error)\n".utf8)

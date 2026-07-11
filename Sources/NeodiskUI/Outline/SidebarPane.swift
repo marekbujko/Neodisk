@@ -201,13 +201,17 @@ struct SidebarPane: View {
 
     // MARK: - Volume capacity bars
 
-    /// Reloads whenever a volume's cached scan or the palette changes —
-    /// a fresh scan finishing writes a new sidecar and a new scan date.
+    /// Reloads whenever a sidecar lands or the palette changes. The
+    /// sidecar generation — not the scan date — is the fresh-scan trigger:
+    /// the sidecar is written asynchronously after the save that updates
+    /// `cachedScanInfo`, so a date-keyed reload would run too early, find
+    /// no sidecar, and leave the bar empty until the next scan.
     private var volumeBarsTaskID: String {
         let scans = model.volumeLocations.map { target in
             "\(target.id)|\(model.cachedScanInfo[target.id].map(\.lastScanDate.timeIntervalSince1970) ?? 0)"
         }
         return scans.joined(separator: ",")
+            + "|\(model.kindStatsSidecarGeneration)"
             + "|\(model.preferences?.useColorblindPalette == true)"
     }
 
