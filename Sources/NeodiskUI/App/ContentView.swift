@@ -158,62 +158,83 @@ public struct ContentView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            Picker("View", selection: $preferences.vizViewMode) {
-                Label("Treemap", systemImage: "square.split.bottomrightquarter")
-                    .tag(VizViewMode.treemap)
-                Label("Sunburst", systemImage: "chart.pie")
-                    .tag(VizViewMode.sunburst)
-            }
-            .pickerStyle(.segmented)
-            .disabled(model.coordinator.snapshot == nil)
-            .help("Switch between treemap and sunburst views")
+            vizModePicker
         }
 
-        // Update status pill: its own toolbar item so it renders as a
-        // standalone cluster left of the button group instead of expanding
-        // it. Hidden while idle; once a check runs it persists until the
-        // user acts on it (see UpdateIndicator). On macOS 26 adjacent items
-        // share one glass background; the spacer forces the visual break.
-        ToolbarItem {
-            UpdateIndicator(viewModel: updates.viewModel)
-        }
+        // Update status pill kept visually separate from the trailing button
+        // group. On macOS 26 every toolbar item in a logical group shares one
+        // Liquid Glass capsule, which fuses the pill onto the button group and
+        // makes that capsule grow when the pill appears. A ToolbarSpacer does
+        // not break the grouping here; `sharedBackgroundVisibility(.hidden)`
+        // does — it drops the pill out of the shared glass so it renders as
+        // its own cluster (its own capsule, drawn by UpdateIndicator) with a
+        // gap before the button group. Older systems have no shared-glass
+        // grouping, so the pill is simply its own item ahead of the group.
+        // Hidden while idle; once a check runs it persists until the user acts
+        // on it (see UpdateIndicator).
         if #available(macOS 26.0, *) {
-            ToolbarSpacer(.fixed)
-        }
-
-        ToolbarItemGroup {
-            // One fixed slot: Stop while a scan runs, Rescan otherwise
-            // (grayed out until there is something to rescan).
-            if model.coordinator.isScanning {
-                Button {
-                    model.stopScan()
-                } label: {
-                    Label("Stop", systemImage: "stop.circle")
-                }
-                .help("Stop the current scan")
-            } else {
-                Button {
-                    model.rescan()
-                } label: {
-                    Label("Rescan", systemImage: "arrow.clockwise")
-                }
-                .disabled(!model.coordinator.canRescan || model.coordinator.snapshot == nil)
-                .help("Scan \(model.coordinator.selectedTarget?.displayName ?? "this location") again")
+            ToolbarItem(placement: .primaryAction) {
+                UpdateIndicator(viewModel: updates.viewModel)
             }
+            .sharedBackgroundVisibility(.hidden)
+            ToolbarItemGroup(placement: .primaryAction) {
+                trailingButtons
+            }
+        } else {
+            ToolbarItem(placement: .primaryAction) {
+                UpdateIndicator(viewModel: updates.viewModel)
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                trailingButtons
+            }
+        }
+    }
 
+    private var vizModePicker: some View {
+        Picker("View", selection: $preferences.vizViewMode) {
+            Label("Treemap", systemImage: "square.split.bottomrightquarter")
+                .tag(VizViewMode.treemap)
+            Label("Sunburst", systemImage: "chart.pie")
+                .tag(VizViewMode.sunburst)
+        }
+        .pickerStyle(.segmented)
+        .disabled(model.coordinator.snapshot == nil)
+        .help("Switch between treemap and sunburst views")
+    }
+
+    @ViewBuilder
+    private var trailingButtons: some View {
+        // One fixed slot: Stop while a scan runs, Rescan otherwise
+        // (grayed out until there is something to rescan).
+        if model.coordinator.isScanning {
             Button {
-                model.showKindStats.toggle()
+                model.stopScan()
             } label: {
-                Label("Statistics", systemImage: "sidebar.right")
+                Label("Stop", systemImage: "stop.circle")
             }
-            .disabled(model.coordinator.snapshot == nil)
-            .help(model.showKindStats ? "Hide the statistics panel" : "Show the statistics panel")
-
-            SettingsLink {
-                Label("Settings", systemImage: "gearshape")
+            .help("Stop the current scan")
+        } else {
+            Button {
+                model.rescan()
+            } label: {
+                Label("Rescan", systemImage: "arrow.clockwise")
             }
-            .help("Open Neodisk settings")
+            .disabled(!model.coordinator.canRescan || model.coordinator.snapshot == nil)
+            .help("Scan \(model.coordinator.selectedTarget?.displayName ?? "this location") again")
         }
+
+        Button {
+            model.showKindStats.toggle()
+        } label: {
+            Label("Statistics", systemImage: "sidebar.right")
+        }
+        .disabled(model.coordinator.snapshot == nil)
+        .help(model.showKindStats ? "Hide the statistics panel" : "Show the statistics panel")
+
+        SettingsLink {
+            Label("Settings", systemImage: "gearshape")
+        }
+        .help("Open Neodisk settings")
     }
 }
 
