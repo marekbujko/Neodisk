@@ -159,12 +159,16 @@ public struct ContentView: View {
             .help("Switch between treemap and sunburst views")
         }
 
-        ToolbarItemGroup {
-            // Update status pill: sits between the center view picker and
-            // the trailing buttons. Hidden while idle; once a check runs it
-            // persists until the user acts on it (see UpdateIndicator).
+        // Update status pill: its own toolbar item so it renders as a
+        // standalone cluster left of the button group instead of expanding
+        // it. Hidden while idle; once a check runs it persists until the
+        // user acts on it (see UpdateIndicator).
+        ToolbarItem {
             UpdateIndicator(viewModel: updates.viewModel)
+                .padding(.trailing, 6)
+        }
 
+        ToolbarItemGroup {
             // One fixed slot: Stop while a scan runs, Rescan otherwise
             // (grayed out until there is something to rescan).
             if model.coordinator.isScanning {
