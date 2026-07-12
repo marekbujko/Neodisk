@@ -1,0 +1,131 @@
+name: Bug Report
+description: Report a reproducible Neodisk bug.
+labels:
+  - bug
+body:
+  - type: checkboxes
+    id: latest_version
+    attributes:
+      label: Latest Version
+      description: Please confirm you are using the latest Neodisk release before reporting a bug.
+      options:
+        - label: I am using the latest version of Neodisk.
+          required: true
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected Area
+      description: Pick the closest part of Neodisk.
+      options:
+        - Scan engine / scan progress / scan results
+        - Outline list
+        - Treemap
+        - Sunburst
+        - Statistics (Kinds, Largest, Age, Duplicates, Changes)
+        - Locations sidebar
+        - Search
+        - Quick Look / Finder integration
+        - Settings
+        - Updates
+        - Crash or hang
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What broke?
+      placeholder: Neodisk skipped files in ~/Library without showing a clear warning.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: List the actions that trigger the bug.
+      placeholder: |
+        1. Open Neodisk
+        2. Scan a folder or volume
+        3. Click a treemap cell
+        4. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should Neodisk do instead?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      description: How often can you reproduce this?
+      options:
+        - Every time
+        - Often
+        - Sometimes
+        - Once
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scan_target
+    attributes:
+      label: Scan Target
+      description: If this involves scanning, what kind of path was scanned?
+      options:
+        - Home folder
+        - Desktop, Documents, or Downloads
+        - Library folder
+        - Applications folder
+        - Macintosh HD or startup volume
+        - External drive
+        - Network volume
+        - Package or app bundle
+        - Other
+    validations:
+      required: false
+
+  - type: input
+    id: neodisk_version
+    attributes:
+      label: Neodisk Version
+      description: App release where the bug occurred (shown in the status bar and in About Neodisk).
+      placeholder: v2.17.0
+    validations:
+      required: true
+
+  - type: input
+    id: macos_version
+    attributes:
+      label: macOS Version
+      placeholder: macOS 15.5
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, Crash Report, Screenshots, or Diagnostics
+      description: Attach relevant evidence. Be mindful of private paths and file names.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: regression
+    attributes:
+      label: Regression
+      description: If this worked before, which Neodisk version last worked?
+      placeholder: Worked in v2.15.0.
+    validations:
+      required: false

@@ -1,0 +1,73 @@
+name: Feature Request
+description: Suggest a focused Neodisk improvement.
+labels:
+  - enhancement
+body:
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected Area
+      description: Pick the closest part of Neodisk.
+      options:
+        - Scan engine / scan progress / scan results
+        - Outline list
+        - Treemap
+        - Sunburst
+        - Statistics (Kinds, Largest, Age, Duplicates, Changes)
+        - Locations sidebar
+        - Search
+        - Quick Look / Finder integration
+        - Settings
+        - Updates
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: request_type
+    attributes:
+      label: Request Type
+      description: What kind of improvement is this?
+      options:
+        - New feature
+        - Existing feature improvement
+        - Performance improvement
+        - Accessibility improvement
+        - Workflow or usability improvement
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What should Neodisk support or improve?
+      placeholder: Neodisk should let me compare any two scans of the same folder to see what changed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: Why is this improvement needed?
+      placeholder: After a large cleanup, I cannot tell which folders grew again without rescanning and manually comparing results.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the behavior you want. Include UI details if they matter.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add screenshots, mockups, links, or examples. Be mindful of private paths and file names.
+    validations:
+      required: false
