@@ -699,7 +699,8 @@ public struct FileTreeStore: Sendable {
                 parentIndices: scopedParents,
                 childStarts: childStarts,
                 childSlots: childSlots,
-                indexByID: scopedIndexByID
+                indexByID: scopedIndexByID,
+                nodeHashes: NodeIDIndex.parallelHashes(of: scopedNodes)
             ),
             rootID: targetID
         )

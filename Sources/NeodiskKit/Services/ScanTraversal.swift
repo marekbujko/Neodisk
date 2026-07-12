@@ -268,7 +268,8 @@ nonisolated final class ScanTraversal {
                 parentIndices: [-1],
                 childStarts: [0, 0],
                 childSlots: leafChildSlots,
-                indexByID: [leafResult.node.id: 0]
+                indexByID: [leafResult.node.id: 0],
+                nodeHashes: NodeIDIndex.parallelHashes(of: leafNodes)
             ),
             rootID: leafResult.node.id
         )
@@ -815,7 +816,8 @@ nonisolated final class ScanTraversal {
                 parentIndices: parentIndices,
                 childStarts: childStarts,
                 childSlots: childSlots,
-                indexByID: indexByID
+                indexByID: indexByID,
+                nodeHashes: NodeIDIndex.parallelHashes(of: nodes)
             ),
             rootID: rootNode.id,
             aggregateStats: aggregateStats.makeStats(root: rootNode)

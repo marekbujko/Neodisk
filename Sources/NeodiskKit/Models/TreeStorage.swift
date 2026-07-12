@@ -28,6 +28,11 @@ nonisolated final class TreeStorage: Sendable {
     /// Node ID (absolute path) → index. Keys alias the node records' `id`
     /// strings.
     let indexByID: NodeIDIndex
+    /// FNV-1a hash of each node's ID, parallel to `nodes`. Lets cross-tree
+    /// lookups (the changes-list diff) probe another store's index with an
+    /// already-computed hash instead of rehashing a full path. Empty means
+    /// "not populated" — callers fall back to rehashing (see `nodeHash`).
+    let nodeHashes: [UInt64]
 
     static let empty = TreeStorage(
         nodes: [],
@@ -42,13 +47,15 @@ nonisolated final class TreeStorage: Sendable {
         parentIndices: [Int32],
         childStarts: [Int32],
         childSlots: [Int32],
-        indexByID: NodeIDIndex
+        indexByID: NodeIDIndex,
+        nodeHashes: [UInt64] = []
     ) {
         self.nodes = nodes
         self.parentIndices = parentIndices
         self.childStarts = childStarts
         self.childSlots = childSlots
         self.indexByID = indexByID
+        self.nodeHashes = nodeHashes
     }
 
     var count: Int {
@@ -57,6 +64,19 @@ nonisolated final class TreeStorage: Sendable {
 
     func index(of id: String) -> Int32? {
         indexByID[id]
+    }
+
+    /// Like `index(of:)` but probes with a caller-supplied FNV-1a hash of
+    /// `id` (typically another store's stored `nodeHash`), skipping the
+    /// rehash. String equality still decides matches, so collisions are safe.
+    func index(of id: String, hash: UInt64) -> Int32? {
+        indexByID.lookup(hash: hash, id: id)
+    }
+
+    /// FNV-1a hash of `nodes[index].id`. Uses the stored parallel array when
+    /// present, otherwise rehashes so every construction path stays correct.
+    func nodeHash(at index: Int) -> UInt64 {
+        nodeHashes.count == nodes.count ? nodeHashes[index] : FNV1a.hash(nodes[index].id)
     }
 
     func childIndices(of index: Int32) -> ArraySlice<Int32> {
@@ -114,7 +134,8 @@ nonisolated final class TreeStorage: Sendable {
             parentIndices: parentIndices,
             childStarts: childStarts,
             childSlots: childSlots,
-            indexByID: indexByID
+            indexByID: indexByID,
+            nodeHashes: NodeIDIndex.parallelHashes(of: nodes)
         )
     }
 
@@ -159,6 +180,16 @@ nonisolated final class TreeStorage: Sendable {
         var newIndexByID = indexByID
         newIndexByID[child.id] = Int32(nodes.count)
 
+        // The root's ID is unchanged, so its stored hash carries over; only
+        // the appended child needs a fresh hash. Drop to empty (rehash
+        // fallback) if the source store had no hashes to extend.
+        var newHashes = nodeHashes
+        if newHashes.count == nodes.count {
+            newHashes.append(FNV1a.hash(child.id))
+        } else {
+            newHashes = []
+        }
+
         var (newStarts, newSlots) = Self.childLayout(parentIndices: newParents)
         let rootRange = Int(newStarts[0])..<Int(newStarts[1])
         let orderedRootChildren = rootChildOrder.compactMap { newIndexByID[$0] }
@@ -171,7 +202,8 @@ nonisolated final class TreeStorage: Sendable {
             parentIndices: newParents,
             childStarts: newStarts,
             childSlots: newSlots,
-            indexByID: newIndexByID
+            indexByID: newIndexByID,
+            nodeHashes: newHashes
         )
     }
 

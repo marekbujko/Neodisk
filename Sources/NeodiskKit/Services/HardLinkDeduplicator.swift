@@ -125,7 +125,10 @@ nonisolated struct HardLinkDeduplicator {
                 parentIndices: storage.parentIndices,
                 childStarts: storage.childStarts,
                 childSlots: childSlots,
-                indexByID: storage.indexByID
+                indexByID: storage.indexByID,
+                // Only node sizes change here, never IDs, so the stored
+                // per-node hashes carry over unchanged.
+                nodeHashes: storage.nodeHashes
             ),
             rootID: store.rootID
         )

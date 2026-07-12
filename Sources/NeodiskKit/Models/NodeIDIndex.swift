@@ -72,6 +72,14 @@ nonisolated struct NodeIDIndex: Sendable {
         }
     }
 
+    /// Probe with a precomputed FNV-1a hash of `id` instead of rehashing the
+    /// (possibly long) path. Equality still compares the string, so a hash
+    /// collision costs a memcmp, never a wrong answer — pass the hash the
+    /// storage already stored for the node whose ID you are looking up.
+    func lookup(hash: UInt64, id: String) -> Int32? {
+        shards[Self.shardIndex(for: hash)][HashedKey(hash: hash, id: id)]
+    }
+
     /// Same contract as Dictionary.updateValue: returns the previous value,
     /// or nil when the key was newly inserted.
     @discardableResult
@@ -81,12 +89,21 @@ nonisolated struct NodeIDIndex: Sendable {
             .updateValue(value, forKey: HashedKey(hash: hash, id: id))
     }
 
-    /// Bulk build for a decoded preorder node array: hashes and shard fills
-    /// both run in parallel. Returns nil when two nodes share an ID — the
-    /// duplicate detection the serial insert loop used to provide.
-    static func building(from nodes: [FileNodeRecord]) -> NodeIDIndex? {
+    /// Insert variant that takes an already-computed hash of `id`. Used to
+    /// force hash collisions in tests (two different IDs under one hash), and
+    /// avoids rehashing when a caller holds the hash already.
+    @discardableResult
+    mutating func updateValue(_ value: Int32, forKey id: String, hash: UInt64) -> Int32? {
+        shards[Self.shardIndex(for: hash)]
+            .updateValue(value, forKey: HashedKey(hash: hash, id: id))
+    }
+
+    /// FNV-1a hash of each node's ID, in the node array's order, computed in
+    /// disjoint parallel chunks. Shared by `building` (which also shards on
+    /// it) and by storage that keeps the per-node hash for later lookups.
+    static func parallelHashes(of nodes: [FileNodeRecord]) -> [UInt64] {
         let nodeCount = nodes.count
-        guard nodeCount > 0 else { return NodeIDIndex() }
+        guard nodeCount > 0 else { return [] }
 
         var hashes = [UInt64](repeating: 0, count: nodeCount)
         hashes.withUnsafeMutableBufferPointer { buffer in
@@ -103,6 +120,19 @@ nonisolated struct NodeIDIndex: Sendable {
                 }
             }
         }
+        return hashes
+    }
+
+    /// Bulk build for a decoded preorder node array: hashes and shard fills
+    /// both run in parallel. Returns the built index alongside the per-node
+    /// FNV hashes (in node order) so storage can keep them for later lookups
+    /// instead of rehashing. Returns nil when two nodes share an ID — the
+    /// duplicate detection the serial insert loop used to provide.
+    static func building(from nodes: [FileNodeRecord]) -> (index: NodeIDIndex, hashes: [UInt64])? {
+        let nodeCount = nodes.count
+        guard nodeCount > 0 else { return (NodeIDIndex(), []) }
+
+        let hashes = parallelHashes(of: nodes)
 
         var builtShards = [[HashedKey: Int32]?](repeating: nil, count: shardCount)
         var duplicateFlags = [Bool](repeating: false, count: shardCount)
@@ -133,7 +163,7 @@ nonisolated struct NodeIDIndex: Sendable {
 
         var index = NodeIDIndex()
         index.shards = builtShards.map { $0 ?? [:] }
-        return index
+        return (index, hashes)
     }
 }
 

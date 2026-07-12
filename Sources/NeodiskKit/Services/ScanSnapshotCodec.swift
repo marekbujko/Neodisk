@@ -387,7 +387,7 @@ nonisolated enum ScanSnapshotCodec {
         guard let rootNode = nodes.first else {
             throw ScanSnapshotCacheError.corruptData("no root node")
         }
-        guard let indexByID = NodeIDIndex.building(from: nodes) else {
+        guard let built = NodeIDIndex.building(from: nodes) else {
             throw ScanSnapshotCacheError.corruptData("duplicate node IDs")
         }
 
@@ -397,7 +397,8 @@ nonisolated enum ScanSnapshotCodec {
                 parentIndices: parentIndices,
                 childStarts: childStarts,
                 childSlots: childSlots,
-                indexByID: indexByID
+                indexByID: built.index,
+                nodeHashes: built.hashes
             ),
             rootID: rootNode.id,
             aggregateStats: aggregateStats

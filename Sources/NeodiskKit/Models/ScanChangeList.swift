@@ -139,15 +139,19 @@ public struct ScanChangeList: Sendable, Equatable {
         // subtree suppression is one parent lookup) and emit grown/shrunk
         // leaves and renamed entries along the way.
         let currentNodes = current.storage.nodes
+        let currentStorage = current.storage
+        let previousStorage = previous.storage
         var currentClasses = [CurrentClass](repeating: .present, count: currentNodes.count)
         var consumedPreviousIndices = Set<Int32>()
         for index in currentNodes.indices {
-            let node = currentNodes[index]
-            let parentClass: CurrentClass? = current.storage
+            // Read fields off the storage array rather than binding the whole
+            // record — classifying a node retains no Strings; only the rare
+            // emitted entry copies id/name/path.
+            let parentClass: CurrentClass? = currentStorage
                 .parentIndex(of: Int32(index))
                 .map { currentClasses[Int($0)] }
 
-            if node.isSynthetic || parentClass == .ignored {
+            if currentNodes[index].isSynthetic || parentClass == .ignored {
                 currentClasses[index] = .ignored
                 continue
             }
@@ -158,17 +162,22 @@ public struct ScanChangeList: Sendable, Equatable {
                 continue
             }
 
-            if let previousIndex = previous.storage.index(of: node.id) {
+            // Cross-tree lookup with the hash the current store already holds
+            // for this node — no rehash of the absolute path (string equality
+            // still decides the match, so collisions stay safe).
+            let nodeHash = currentStorage.nodeHash(at: index)
+            if let previousIndex = previousStorage.index(of: currentNodes[index].id, hash: nodeHash) {
                 currentClasses[index] = .present
-                let previousNode = previous.storage.nodes[Int(previousIndex)]
-                let delta = node.allocatedSize - previousNode.allocatedSize
+                let delta = currentNodes[index].allocatedSize
+                    - previousStorage.nodes[Int(previousIndex)].allocatedSize
                 // Leaf in both trees (files, opaque packages, summarized
                 // folders): a directory that emptied or filled is reported
                 // through its children's deleted/added entries instead —
                 // one row per change, no double counting.
                 if delta != 0,
-                   current.storage.childCount(of: Int32(index)) == 0,
-                   previous.storage.childCount(of: previousIndex) == 0 {
+                   currentStorage.childCount(of: Int32(index)) == 0,
+                   previousStorage.childCount(of: previousIndex) == 0 {
+                    let node = currentNodes[index]
                     entries.append(ScanChangeEntry(
                         kind: delta > 0 ? .grown : .shrunk,
                         nodeID: node.id,
@@ -183,17 +192,21 @@ public struct ScanChangeList: Sendable, Equatable {
                 continue
             }
 
-            if let identity = node.fileIdentity, node.linkCount == 1,
+            if let identity = currentNodes[index].fileIdentity, currentNodes[index].linkCount == 1,
                let previousIndex = previousIndexByIdentity[identity],
                previousIndex != ambiguousIndex,
                !consumedPreviousIndices.contains(previousIndex) {
-                let previousNode = previous.storage.nodes[Int(previousIndex)]
+                let previousNode = previousStorage.nodes[Int(previousIndex)]
                 // The old path must be gone: an identity whose old path is
                 // still occupied is an atomic-save/inode-migration artifact,
                 // not a move.
-                if current.storage.index(of: previousNode.id) == nil {
+                if currentStorage.index(
+                    of: previousNode.id,
+                    hash: previousStorage.nodeHash(at: Int(previousIndex))
+                ) == nil {
                     currentClasses[index] = .moved
                     consumedPreviousIndices.insert(previousIndex)
+                    let node = currentNodes[index]
                     entries.append(ScanChangeEntry(
                         kind: .renamed,
                         nodeID: node.id,
@@ -243,21 +256,23 @@ public struct ScanChangeList: Sendable, Equatable {
         // Pass 3 — the previous tree's side: what vanished. Rename sources
         // and everything beneath them are accounted for by their renamed
         // entries; fully deleted subtrees collapse like fully added ones.
-        let previousNodes = previous.storage.nodes
+        let previousNodes = previousStorage.nodes
         var previousClasses = [PreviousClass](repeating: .present, count: previousNodes.count)
         for index in previousNodes.indices {
-            let node = previousNodes[index]
-            let parentClass: PreviousClass? = previous.storage
+            let parentClass: PreviousClass? = previousStorage
                 .parentIndex(of: Int32(index))
                 .map { previousClasses[Int($0)] }
 
-            if node.isSynthetic || parentClass == .ignored {
+            if previousNodes[index].isSynthetic || parentClass == .ignored {
                 previousClasses[index] = .ignored
             } else if parentClass == .movedSource || parentClass == .withinMovedSource {
                 previousClasses[index] = .withinMovedSource
             } else if consumedPreviousIndices.contains(Int32(index)) {
                 previousClasses[index] = .movedSource
-            } else if current.storage.index(of: node.id) != nil {
+            } else if currentStorage.index(
+                of: previousNodes[index].id,
+                hash: previousStorage.nodeHash(at: index)
+            ) != nil {
                 previousClasses[index] = .present
             } else {
                 previousClasses[index] = .deleted
