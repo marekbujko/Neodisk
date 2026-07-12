@@ -406,7 +406,112 @@ import Testing
         #expect(await cache.totalSizeOnDisk() == 0)
     }
 
+    // MARK: - Cached duplicate results (`.nddup`)
+
+    @Test func testDuplicateResultsCacheHitMissAndInvalidation() async throws {
+        let cacheDirectory = makeTemporaryCacheDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        let cache = ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false)
+        let target = makeTestTarget("/cache/nddup")
+        let minimumFileSize: Int64 = 1 << 20
+
+        // No snapshot yet: nothing to key on, so save is a no-op.
+        #expect(await cache.duplicateResultsCacheKey(
+            forTargetID: target.id, minimumFileSize: minimumFileSize
+        ) == nil)
+        await cache.saveDuplicateResults(
+            makeDuplicateResults(), computedAt: Date(), forTargetID: target.id, minimumFileSize: minimumFileSize
+        )
+        #expect(await cache.loadDuplicateResults(
+            forTargetID: target.id, minimumFileSize: minimumFileSize
+        ) == nil)
+
+        // A single snapshot is enough to key a duplicate result (unlike the
+        // diff, which needs a rotated predecessor).
+        try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100)]))
+        let results = makeDuplicateResults()
+        let computedAt = Date(timeIntervalSinceReferenceDate: 54_321)
+        await cache.saveDuplicateResults(
+            results, computedAt: computedAt, forTargetID: target.id, minimumFileSize: minimumFileSize
+        )
+
+        // Hit: same snapshot file, same minimum file size.
+        let hit = try #require(await cache.loadDuplicateResults(
+            forTargetID: target.id, minimumFileSize: minimumFileSize
+        ))
+        #expect(hit.results == results)
+        #expect(abs(hit.computedAt.timeIntervalSince(computedAt)) < 0.001)
+
+        // Miss: a different minimum file size is a different key.
+        #expect(await cache.loadDuplicateResults(
+            forTargetID: target.id, minimumFileSize: 2 << 20
+        ) == nil)
+
+        // Invalidation: a rescan rewrites the snapshot file, changing its
+        // identity, so the stale result no longer matches.
+        try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100), ("b.bin", 500)]))
+        #expect(await cache.loadDuplicateResults(
+            forTargetID: target.id, minimumFileSize: minimumFileSize
+        ) == nil)
+    }
+
+    @Test func testDuplicateResultsCacheIsPrunedAndRemovedWithItsSnapshot() async throws {
+        let cacheDirectory = makeTemporaryCacheDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        let cache = ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false)
+        let target = makeTestTarget("/cache/nddup-prune")
+        let minimumFileSize: Int64 = 1 << 20
+
+        try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100)]))
+        await cache.saveDuplicateResults(
+            makeDuplicateResults(), computedAt: Date(), forTargetID: target.id, minimumFileSize: minimumFileSize
+        )
+        #expect(duplicateResultsFileURLs(in: cacheDirectory).count == 1)
+
+        // Pruning keeps the result whose snapshot survives …
+        _ = await cache.pruneAndIndex(keepingTargetIDs: [target.id])
+        #expect(duplicateResultsFileURLs(in: cacheDirectory).count == 1)
+
+        // … and drops it with a pruned snapshot.
+        _ = await cache.pruneAndIndex(keepingTargetIDs: [])
+        #expect(duplicateResultsFileURLs(in: cacheDirectory).isEmpty)
+
+        // removeSnapshot and removeAll clear it too, and it counts toward the
+        // total on disk.
+        try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100)]))
+        await cache.saveDuplicateResults(
+            makeDuplicateResults(), computedAt: Date(), forTargetID: target.id, minimumFileSize: minimumFileSize
+        )
+        #expect(await cache.totalSizeOnDisk() > 0)
+        await cache.removeSnapshot(forTargetID: target.id)
+        #expect(duplicateResultsFileURLs(in: cacheDirectory).isEmpty)
+
+        try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100)]))
+        await cache.saveDuplicateResults(
+            makeDuplicateResults(), computedAt: Date(), forTargetID: target.id, minimumFileSize: minimumFileSize
+        )
+        await cache.removeAll()
+        #expect(duplicateResultsFileURLs(in: cacheDirectory).isEmpty)
+        #expect(await cache.totalSizeOnDisk() == 0)
+    }
+
     // MARK: - Helpers
+
+    private func duplicateResultsFileURLs(in directory: URL) -> [URL] {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil
+        )) ?? []
+        return contents.filter { $0.pathExtension == "nddup" }
+    }
+
+    private func makeDuplicateResults() -> DuplicateScanResults {
+        let group = DuplicateGroup(
+            id: "abc-100", fileSize: 100, nodeIDs: ["/x/a.bin", "/x/b.bin"]
+        )
+        return DuplicateScanResults(
+            groups: [group], totalWastedBytes: 100, candidateCount: 2, unreadableCount: 0
+        )
+    }
 
     private func changeListFileURLs(in directory: URL) -> [URL] {
         let contents = (try? FileManager.default.contentsOfDirectory(

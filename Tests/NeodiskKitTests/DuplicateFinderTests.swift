@@ -391,6 +391,23 @@ import Testing
             #expect(fractions.last == 1.0)
         }
     }
+
+    @Test func testResultsCodableRoundTrip() throws {
+        let results = DuplicateScanResults(
+            groups: [
+                DuplicateGroup(id: "h1-2048", fileSize: 2048, nodeIDs: ["/a/one", "/b/one"]),
+                DuplicateGroup(id: "h2-4096", fileSize: 4096, nodeIDs: ["/a/two", "/b/two", "/c/two"])
+            ],
+            totalWastedBytes: 2048 + 4096 * 2,
+            candidateCount: 5,
+            unreadableCount: 1
+        )
+        let data = try JSONEncoder().encode(results)
+        let decoded = try JSONDecoder().decode(DuplicateScanResults.self, from: data)
+        #expect(decoded == results)
+        // Derived accessors survive the round trip.
+        #expect(decoded.groups.first?.wastedBytes == 2048)
+    }
 }
 
 /// Progress callbacks arrive from an arbitrary executor; collect behind a

@@ -236,7 +236,7 @@ final class NeodiskViewModel {
         self.kinds = KindStatsModel(coordinator: coordinator, indexService: searchIndexService)
         self.largest = LargestFilesModel(coordinator: coordinator, indexService: searchIndexService)
         self.ages = AgeStatsModel(coordinator: coordinator, indexService: searchIndexService)
-        self.duplicates = DuplicatesModel(coordinator: coordinator)
+        self.duplicates = DuplicatesModel(coordinator: coordinator, snapshotCache: snapshotCache)
         self.diff = DiffModel(coordinator: coordinator, snapshotCache: snapshotCache)
         self.changes = ChangesModel(coordinator: coordinator, snapshotCache: snapshotCache)
         sidebarFolders = sidebarFolderStore.load()
@@ -575,9 +575,10 @@ final class NeodiskViewModel {
     private func snapshotWasRestoredWithoutRescan() {
         guard let snapshot = coordinator.snapshot, snapshot.isComplete else { return }
         diff.snapshotWasRestored(for: snapshot.target)
-        if preferences?.autoScanDuplicates == true {
-            duplicates.startScan()
-        }
+        // Prefer a persisted duplicate result over re-hashing: load the cached
+        // run if present, and only start a fresh scan on a miss when the opt-in
+        // preference is on. Relaunch never silently recomputes.
+        duplicates.loadCachedResults(orScanIfMissing: preferences?.autoScanDuplicates == true)
     }
 
     /// The decoded snapshot is the on-disk truth. If the in-memory index

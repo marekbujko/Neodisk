@@ -20,7 +20,7 @@ import Darwin
 import Foundation
 
 /// One set of files whose contents are byte-identical.
-public struct DuplicateGroup: Sendable, Equatable, Identifiable {
+public struct DuplicateGroup: Sendable, Equatable, Identifiable, Codable {
     /// Content-derived: the confirming hash plus the file size.
     public let id: String
     /// Logical size of each copy.
@@ -41,7 +41,7 @@ public struct DuplicateGroup: Sendable, Equatable, Identifiable {
     }
 }
 
-public struct DuplicateScanResults: Sendable, Equatable {
+public struct DuplicateScanResults: Sendable, Equatable, Codable {
     /// Confirmed groups, biggest waste first.
     public let groups: [DuplicateGroup]
     public let totalWastedBytes: Int64

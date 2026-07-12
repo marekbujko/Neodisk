@@ -59,6 +59,7 @@ public actor ScanSnapshotCache {
     private static let fileExtension = "ndscan"
     private static let auxiliaryFileExtension = "ndaux"
     private static let changeListFileExtension = "nddiff"
+    private static let duplicateResultsFileExtension = "nddup"
 
     private let directoryURL: URL
     private let isLoggingEnabled: Bool
@@ -196,6 +197,10 @@ public actor ScanSnapshotCache {
             log("pruning orphaned change-list cache \(url.lastPathComponent)")
             try? FileManager.default.removeItem(at: url)
         }
+        for url in duplicateResultsFileURLs() where !latestBasenames.contains(Self.slotBasename(url)) {
+            log("pruning orphaned duplicate-results cache \(url.lastPathComponent)")
+            try? FileManager.default.removeItem(at: url)
+        }
 
         var infoByPath: [String: CachedScanInfo] = [:]
         for (path, metadata) in latestMetadataByPath {
@@ -280,22 +285,75 @@ public actor ScanSnapshotCache {
         try? data.write(to: changeListFileURL(forTargetID: targetID), options: .atomic)
     }
 
+    // MARK: - Cached duplicate results (`.nddup` slot)
+
+    /// The content-stable key for a target's cached duplicate result: the
+    /// identity of the current snapshot file plus the minimum file size the
+    /// scan used. Nil when the snapshot file is missing (nothing scanned yet).
+    public func duplicateResultsCacheKey(
+        forTargetID targetID: String,
+        minimumFileSize: Int64
+    ) -> DuplicateResultsCacheKey? {
+        guard let current = fileSignature(at: fileURL(forTargetID: targetID)) else {
+            return nil
+        }
+        return DuplicateResultsCacheKey(
+            snapshotSize: current.size,
+            snapshotModified: current.modified,
+            minimumFileSize: minimumFileSize
+        )
+    }
+
+    /// Returns the persisted duplicate result for a target only when it is
+    /// still valid for the current snapshot file (same identity, minimum file
+    /// size, and duplicate format); otherwise nil so the caller can re-hash.
+    public func loadDuplicateResults(
+        forTargetID targetID: String,
+        minimumFileSize: Int64
+    ) -> DuplicateResultsCacheEntry? {
+        guard let key = duplicateResultsCacheKey(forTargetID: targetID, minimumFileSize: minimumFileSize),
+              let data = try? Data(contentsOf: duplicateResultsFileURL(forTargetID: targetID)),
+              let entry = DuplicateResultsCacheEntry.decoding(data),
+              entry.isValid(for: key) else {
+            return nil
+        }
+        return entry
+    }
+
+    /// Persists a computed duplicate result, keyed on the current snapshot
+    /// file. A no-op when the file it would key on is missing.
+    public func saveDuplicateResults(
+        _ results: DuplicateScanResults,
+        computedAt: Date,
+        forTargetID targetID: String,
+        minimumFileSize: Int64
+    ) {
+        guard let key = duplicateResultsCacheKey(forTargetID: targetID, minimumFileSize: minimumFileSize) else {
+            return
+        }
+        let entry = DuplicateResultsCacheEntry(key: key, computedAt: computedAt, results: results)
+        guard let data = try? entry.encoded() else { return }
+        try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try? data.write(to: duplicateResultsFileURL(forTargetID: targetID), options: .atomic)
+    }
+
     public func removeSnapshot(forTargetID targetID: String) {
         try? FileManager.default.removeItem(at: fileURL(forTargetID: targetID))
         try? FileManager.default.removeItem(at: previousFileURL(forTargetID: targetID))
         try? FileManager.default.removeItem(at: auxiliaryFileURL(forTargetID: targetID))
         try? FileManager.default.removeItem(at: changeListFileURL(forTargetID: targetID))
+        try? FileManager.default.removeItem(at: duplicateResultsFileURL(forTargetID: targetID))
     }
 
     public func removeAll() {
-        for url in cacheFileURLs() + auxiliaryFileURLs() + changeListFileURLs() {
+        for url in cacheFileURLs() + auxiliaryFileURLs() + changeListFileURLs() + duplicateResultsFileURLs() {
             try? FileManager.default.removeItem(at: url)
         }
     }
 
     /// Total size of all cache files, for the Settings privacy tab.
     public func totalSizeOnDisk() -> Int64 {
-        (cacheFileURLs() + auxiliaryFileURLs() + changeListFileURLs())
+        (cacheFileURLs() + auxiliaryFileURLs() + changeListFileURLs() + duplicateResultsFileURLs())
             .reduce(into: Int64(0)) { total, url in
                 let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
                 total = total.addingClamped(Int64(size))
@@ -341,6 +399,13 @@ public actor ScanSnapshotCache {
         )
     }
 
+    private func duplicateResultsFileURL(forTargetID targetID: String) -> URL {
+        directoryURL.appending(
+            path: "\(Self.hashedName(forTargetID: targetID)).\(Self.duplicateResultsFileExtension)",
+            directoryHint: .notDirectory
+        )
+    }
+
     private static func hashedName(forTargetID targetID: String) -> String {
         let digest = SHA256.hash(data: Data(targetID.utf8))
         return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
@@ -381,6 +446,14 @@ public actor ScanSnapshotCache {
             includingPropertiesForKeys: [.fileSizeKey]
         )) ?? []
         return contents.filter { $0.pathExtension == Self.changeListFileExtension }
+    }
+
+    private func duplicateResultsFileURLs() -> [URL] {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.fileSizeKey]
+        )) ?? []
+        return contents.filter { $0.pathExtension == Self.duplicateResultsFileExtension }
     }
 
     private func elapsedDescription(since start: ContinuousClock.Instant) -> String {
