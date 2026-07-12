@@ -105,6 +105,63 @@ private func makeFixture(fileCount: Int = 6, pageSize: Int = 2) -> CloudFixture 
         #expect(unknown == 0.01)
     }
 
+    @Test func testScanAgainstGoogleProviderBuildsTreeWithUnattributedAndSharedFile() async throws {
+        // A connected account with a live token, so no refresh round-trips.
+        let store = InMemoryTokenStore()
+        try store.save(
+            StoredCredentials(
+                refreshToken: "r", accessToken: "access-live",
+                accessTokenExpiry: Date().addingTimeInterval(3600), email: "me@example.com"
+            ),
+            forProviderID: "google", accountID: "perm-1"
+        )
+        // Drive replies in the order the service asks: quota, root, one file page.
+        // usageInDrive (500) exceeds the sum of quotaBytesUsed (300) → an
+        // Unattributed remainder of 200.
+        let transport = FakeTransport(responses: [
+            .json(200, ["storageQuota": ["limit": "10000", "usageInDrive": "500"]]),
+            .json(200, ["id": "root"]),
+            .json(200, ["files": [
+                ["id": "docs", "name": "Docs", "parents": ["root"],
+                 "mimeType": "application/vnd.google-apps.folder"],
+                ["id": "a", "name": "a.pdf", "parents": ["docs"], "size": "100", "quotaBytesUsed": "100"],
+                ["id": "b", "name": "b.bin", "parents": ["root"], "size": "200", "quotaBytesUsed": "200"],
+                // Shared-with-me file: no parent, zero quota, not owned.
+                ["id": "s", "name": "shared.txt", "size": "999",
+                 "quotaBytesUsed": "0", "ownedByMe": false]
+            ]])
+        ])
+        let provider = GoogleDriveProvider(
+            configuration: GoogleOAuthConfiguration(
+                clientID: "c", clientSecret: "s",
+                tokenEndpoint: URL(string: "https://oauth.example.com/token")!
+            ),
+            transport: transport, tokenStore: store
+        )
+        let service = CloudScanService(providers: [provider], partialInterval: .zero)
+        let target = CloudTargetID.target(
+            providerID: "google", accountID: "perm-1", displayName: "Google Drive"
+        )!
+
+        var finished: ScanSnapshot?
+        for try await event in service.scan(target: target) {
+            if case .finished(let snapshot) = event { finished = snapshot }
+        }
+        let snapshot = try #require(finished)
+
+        // Root totals reconcile to the reported Drive usage.
+        #expect(snapshot.root.allocatedSize == 500)
+
+        let unattributedID = CloudTargetID.nodeID(
+            targetID: target.id, fileID: CloudTreeBuilder.unattributedFileID
+        )
+        #expect(snapshot.treeStore.node(id: unattributedID)?.allocatedSize == 200)
+
+        // The shared 0-quota file lands (under Shared & Orphaned) with no size.
+        let sharedID = CloudTargetID.nodeID(targetID: target.id, fileID: "s")
+        #expect(snapshot.treeStore.node(id: sharedID)?.allocatedSize == 0)
+    }
+
     @Test func testFixtureDecodingFromJSON() throws {
         let json = """
         {

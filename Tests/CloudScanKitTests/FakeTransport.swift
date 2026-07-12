@@ -7,13 +7,20 @@ final class FakeTransport: CloudTransport, @unchecked Sendable {
     struct StubResponse {
         let status: Int
         let body: Data
+        var headers: [String: String] = [:]
 
-        static func json(_ status: Int, _ object: [String: Any]) -> StubResponse {
-            StubResponse(status: status, body: try! JSONSerialization.data(withJSONObject: object))
+        static func json(
+            _ status: Int, _ object: [String: Any], headers: [String: String] = [:]
+        ) -> StubResponse {
+            StubResponse(
+                status: status,
+                body: try! JSONSerialization.data(withJSONObject: object),
+                headers: headers
+            )
         }
 
-        static func empty(_ status: Int) -> StubResponse {
-            StubResponse(status: status, body: Data())
+        static func empty(_ status: Int, headers: [String: String] = [:]) -> StubResponse {
+            StubResponse(status: status, body: Data(), headers: headers)
         }
     }
 
@@ -47,7 +54,7 @@ final class FakeTransport: CloudTransport, @unchecked Sendable {
             url: request.url ?? URL(string: "https://example.com")!,
             statusCode: response.status,
             httpVersion: nil,
-            headerFields: nil
+            headerFields: response.headers.isEmpty ? nil : response.headers
         )!
         return (response.body, http)
     }
