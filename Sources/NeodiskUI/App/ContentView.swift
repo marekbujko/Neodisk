@@ -44,10 +44,16 @@ public struct ContentView: View {
             if !preferences.hasSeenWelcome {
                 model.showWelcomeSheet = true
             }
-            // Dev/testing hook: NEODISK_AUTOSCAN=<path> scans on launch.
+            // Dev/testing hook: NEODISK_AUTOSCAN=<path> scans on launch. A
+            // connected cloud account's target ID (cloudscan://…) works too,
+            // composing with NEODISK_CLOUD_FIXTURE for headless cloud runs.
             if let path = ProcessInfo.processInfo.environment["NEODISK_AUTOSCAN"],
                model.coordinator.phase == .idle {
-                model.startScan(ScanTarget(url: URL(filePath: path, directoryHint: .isDirectory)))
+                if let cloudTarget = model.cloudDriveAccounts.first(where: { $0.id == path }) {
+                    model.startScan(cloudTarget)
+                } else {
+                    model.startScan(ScanTarget(url: URL(filePath: path, directoryHint: .isDirectory)))
+                }
             }
             // Dev/testing hook: NEODISK_ANALYSIS_TAB=<kinds|largest|age|duplicates>
             // opens that statistics tab, so headless snapshots can capture

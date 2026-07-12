@@ -52,6 +52,23 @@ struct SidebarPane: View {
                 }
             }
 
+            if !model.cloudDriveAccounts.isEmpty {
+                Section("Cloud Drives") {
+                    ForEach(model.cloudDriveAccounts) { target in
+                        // No Reveal-in-Finder context menu: cloudscan:// IDs
+                        // are not filesystem paths, so these rows can't reuse
+                        // builtInLocationRow. Sign-out arrives with M2.
+                        SidebarTargetRow(
+                            target: target,
+                            subtitle: model.cloudScan?.accountSubtitle(forTargetID: target.id) ?? target.id,
+                            lastScanned: model.cachedScanInfo[target.id]?.lastScanDate,
+                            now: now
+                        )
+                        .tag(target.id)
+                    }
+                }
+            }
+
             Section("Folders") {
                 ForEach(visibleFolders) { target in
                     SidebarTargetRow(
@@ -367,6 +384,11 @@ private struct SidebarTargetRow: View {
     private var iconName: String {
         if target.kind == .volume {
             return "internaldrive.fill"
+        }
+        // Remote cloud-drive account (CloudScan): distinct from the local
+        // iCloud/Dropbox sync folders below.
+        if target.kind == .cloud {
+            return "externaldrive.badge.icloud"
         }
         if CloudLocationDetector.isCloudPath(target.id) || target.displayName == "Dropbox" {
             return target.displayName.hasPrefix("iCloud") ? "icloud.fill" : "cloud.fill"

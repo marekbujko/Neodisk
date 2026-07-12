@@ -161,9 +161,15 @@ final class NeodiskViewModel {
     /// Locally-synced cloud storage folders (iCloud Drive, File Provider
     /// roots), shown in the sidebar's own "Local Cloud Files" section.
     let cloudLocations = SystemIntegration.cloudTargets()
-    /// The fixed sidebar locations: volumes plus cloud locations. Unlike
-    /// the Folders section these can never be removed.
-    var builtInLocations: [ScanTarget] { volumeLocations + cloudLocations }
+    /// Connected remote cloud-drive accounts (CloudScan), shown in the
+    /// sidebar's "Cloud Drives" section. Seeded once from `cloudScan` at
+    /// launch; empty in builds without the CloudScan feature.
+    private(set) var cloudDriveAccounts: [ScanTarget] = []
+    /// The fixed sidebar locations: volumes, local cloud folders, and remote
+    /// cloud-drive accounts. Unlike the Folders section these can never be
+    /// removed. Feeding cloud accounts through here joins them into sidebar
+    /// selection (`allTargets`), dedup, and the snapshot-cache keep-list.
+    var builtInLocations: [ScanTarget] { volumeLocations + cloudLocations + cloudDriveAccounts }
     /// What the snapshot cache holds per target path: which locations open
     /// instantly from cache, the sidebar's "Scanned … ago" subtitles, and
     /// how long the last scan took (whether a rescan should auto-start).
@@ -237,15 +243,20 @@ final class NeodiskViewModel {
     /// scans probe the cache optimistically instead of trusting the index.
     @ObservationIgnored private var hasIndexedSnapshotCache = false
     @ObservationIgnored private var preferencesCancellable: AnyCancellable?
+    /// The CloudScan integration, or nil in builds without the feature. Owns
+    /// the sidebar's connected accounts and the cloud scan stream.
+    @ObservationIgnored private(set) var cloudScan: (any CloudScanIntegrating)?
 
     init(
         coordinator: ScanCoordinator = ScanCoordinator(),
         snapshotCache: ScanSnapshotCache = ScanSnapshotCache(),
-        sidebarFolderStore: SidebarFolderStore = SidebarFolderStore()
+        sidebarFolderStore: SidebarFolderStore = SidebarFolderStore(),
+        cloudScan: (any CloudScanIntegrating)? = nil
     ) {
         self.coordinator = coordinator
         self.snapshotCache = snapshotCache
         self.sidebarFolderStore = sidebarFolderStore
+        self.cloudScan = cloudScan
         self.search = SearchModel(coordinator: coordinator, indexService: searchIndexService)
         self.kinds = KindStatsModel(coordinator: coordinator, indexService: searchIndexService)
         self.largest = LargestFilesModel(coordinator: coordinator, indexService: searchIndexService)
@@ -274,6 +285,11 @@ final class NeodiskViewModel {
                 self.duplicates.startScan()
             }
         }
+
+        // Seed the connected cloud accounts before the keep-list below is
+        // computed, so their persisted snapshots survive the launch prune
+        // (builtInLocations already folds cloudDriveAccounts in).
+        cloudDriveAccounts = cloudScan?.accountTargets ?? []
 
         // Drop cache entries for locations no longer in the sidebar and
         // learn which targets can open instantly from cache.
@@ -1097,6 +1113,20 @@ final class NeodiskViewModel {
 
     // MARK: - File actions
 
+    /// False for a cloud snapshot: its nodes' paths are `cloudscan://`
+    /// identifiers, not filesystem paths, so Reveal in Finder / Open / Copy
+    /// Path / double-click reveal have nothing on disk to act on.
+    var snapshotSupportsFileActions: Bool {
+        coordinator.snapshot?.target.kind != .cloud
+    }
+
+    /// Whether the node's file actions (Reveal in Finder / Open / Copy Path)
+    /// apply: the node must offer them and the displayed snapshot must be a
+    /// filesystem scan.
+    func supportsFileActions(_ node: FileNodeRecord) -> Bool {
+        node.supportsFileActions && snapshotSupportsFileActions
+    }
+
     /// Spacebar Quick Look shared by the treemap and sunburst: previews the
     /// selected node, so click-then-space works without ever focusing one of
     /// the sidebar lists. Beeps when nothing is selected.
@@ -1111,7 +1141,7 @@ final class NeodiskViewModel {
     /// Return-key reveal shared by the treemap and sunburst. Beeps when the
     /// selection has no on-disk counterpart to show.
     func revealSelection() {
-        guard let node = selectedNode, node.supportsFileActions else {
+        guard let node = selectedNode, supportsFileActions(node) else {
             NSSound.beep()
             return
         }
