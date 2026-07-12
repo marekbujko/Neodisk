@@ -91,6 +91,17 @@ public struct ContentView: View {
         .onDisappear {
             updates.viewModel.hostDidDisappear()
         }
+        // Full Disk Access gates the warning surfaces (panel and notice
+        // strip). Recheck on activation: that is when the user comes back
+        // from granting access in System Settings.
+        .task {
+            await model.refreshFullDiskAccessStatus()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+        ) { _ in
+            Task { await model.refreshFullDiskAccessStatus() }
+        }
         .toolbar { toolbarContent }
         .navigationTitle(windowTitle)
         .alert(
@@ -393,7 +404,11 @@ private struct WorkspaceView: View {
     @AppStorage("kindStatsPaneWidth") private var kindStatsPaneWidth = 230.0
 
     private var permissionDeniedCount: Int {
-        guard let snapshot = model.coordinator.snapshot, snapshot.isComplete else { return 0 }
+        // With Full Disk Access granted the remaining unreadable locations
+        // are protected for reasons no grant can fix, so the notice strip
+        // (like the warnings panel) stays hidden.
+        guard model.fullDiskAccessStatus != .granted,
+              let snapshot = model.coordinator.snapshot, snapshot.isComplete else { return 0 }
         return snapshot.scanWarnings.count { $0.category == .permissionDenied }
     }
 
@@ -466,15 +481,11 @@ private struct WorkspaceView: View {
 }
 
 /// Shown after a scan that hit unreadable locations: totals are
-/// underreported until the app gets Full Disk Access.
+/// underreported until the app gets Full Disk Access. Only mounted while
+/// access is not granted (WorkspaceView zeroes the count otherwise), so it
+/// always offers the Grant button.
 private struct PermissionNoticeStrip: View {
     let count: Int
-
-    /// Offering the Grant button when Full Disk Access is already on is a
-    /// dead end (the remaining unreadable locations are protected for other
-    /// reasons), so the strip probes the status and hides it — rechecking
-    /// on app activation, i.e. when the user returns from System Settings.
-    @State private var accessStatus: FullDiskAccessStatus = .unknown
 
     var body: some View {
         HStack(spacing: 8) {
@@ -483,31 +494,15 @@ private struct PermissionNoticeStrip: View {
             Text("\(count.formatted()) locations couldn't be read — sizes may be underreported.")
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-            if accessStatus != .granted {
-                Button("Grant Full Disk Access…") {
-                    _ = SystemIntegration.prepareAndOpenFullDiskAccessSettings()
-                }
-                .controlSize(.small)
+            Button("Grant Full Disk Access…") {
+                _ = SystemIntegration.prepareAndOpenFullDiskAccessSettings()
             }
+            .controlSize(.small)
             Spacer()
         }
         .font(.system(size: 11))
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .task {
-            await refreshAccessStatus()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
-        ) { _ in
-            Task { await refreshAccessStatus() }
-        }
-    }
-
-    private func refreshAccessStatus() async {
-        accessStatus = await Task.detached(priority: .utility) {
-            SystemIntegration.fullDiskAccessStatus()
-        }.value
     }
 }
 

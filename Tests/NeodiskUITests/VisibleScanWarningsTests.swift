@@ -45,4 +45,39 @@ import NeodiskKit
         #expect(!visible.contains { $0.id == dismissed.id })
         #expect(visible.first?.path == "/root/item-0")
     }
+
+    @Test func testFullDiskAccessHidesPermissionDeniedWarnings() async throws {
+        let cacheDirectory = FileManager.default.temporaryDirectory
+            .appending(path: "VisibleScanWarningsTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        let defaultsSuiteName = "VisibleScanWarningsTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: defaultsSuiteName))
+        defer { removeTestDefaultsSuite(defaults, named: defaultsSuiteName) }
+        let model = NeodiskViewModel(
+            snapshotCache: ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false),
+            sidebarFolderStore: SidebarFolderStore(defaults: defaults)
+        )
+
+        let denied = ScanWarning(path: "/root/protected", message: "denied", category: .permissionDenied)
+        let ioError = ScanWarning(path: "/root/broken", message: "I/O error", category: .fileSystem)
+
+        let file = makeTestFileNode(id: "/root/file", name: "file")
+        let root = makeTestDirectoryNode(id: "/root", name: "root", children: [file])
+        let store = FileTreeStore(root: root, childrenByID: [root.id: [file]])
+        model.coordinator.restoreCompletedSnapshot(
+            makeTestSnapshot(target: makeTestTarget("/root"), root: root, store: store, warnings: [denied, ioError])
+        )
+
+        // Without a Full Disk Access verdict, every warning shows.
+        #expect(model.fullDiskAccessStatus == .unknown)
+        #expect(model.visibleScanWarnings.map(\.id) == [denied.id, ioError.id])
+
+        // Granted: the remaining permission-denied warnings are dead ends no
+        // grant can fix, so they hide; genuine filesystem errors stay.
+        model.fullDiskAccessStatus = .granted
+        #expect(model.visibleScanWarnings.map(\.id) == [ioError.id])
+
+        model.fullDiskAccessStatus = .notGranted
+        #expect(model.visibleScanWarnings.map(\.id) == [denied.id, ioError.id])
+    }
 }
