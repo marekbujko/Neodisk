@@ -46,8 +46,10 @@ public struct NeodiskApp: App {
         }
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("About Neodisk") {
+                Button {
                     AboutPanel.show()
+                } label: {
+                    Label("About Neodisk", systemImage: "info.circle")
                 }
             }
 
