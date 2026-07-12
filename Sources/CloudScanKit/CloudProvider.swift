@@ -28,11 +28,25 @@ public struct CloudAccount: Hashable, Codable, Sendable {
 public struct CloudQuota: Hashable, Codable, Sendable {
     /// nil for unlimited plans.
     public let totalBytes: Int64?
+    /// Bytes used inside the scanned drive itself — what the tree reconciles
+    /// against (Google: storageQuota.usageInDrive).
     public let usedBytes: Int64
+    /// Bytes counted against the account's quota across all its services
+    /// (Google: storageQuota.usage, which includes Gmail/Photos). Free-space
+    /// display reckons against this; nil when the provider has no such split.
+    public let accountUsedBytes: Int64?
 
-    public init(totalBytes: Int64?, usedBytes: Int64) {
+    public init(totalBytes: Int64?, usedBytes: Int64, accountUsedBytes: Int64? = nil) {
         self.totalBytes = totalBytes
         self.usedBytes = usedBytes
+        self.accountUsedBytes = accountUsedBytes
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.totalBytes = try container.decodeIfPresent(Int64.self, forKey: .totalBytes)
+        self.usedBytes = try container.decode(Int64.self, forKey: .usedBytes)
+        self.accountUsedBytes = try container.decodeIfPresent(Int64.self, forKey: .accountUsedBytes)
     }
 }
 

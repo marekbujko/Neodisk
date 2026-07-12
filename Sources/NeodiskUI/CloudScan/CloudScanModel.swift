@@ -61,6 +61,20 @@ final class CloudScanModel: CloudScanIntegrating {
         return provider.displayName
     }
 
+    func quota(forTargetID targetID: String) async -> (totalBytes: Int64?, usedBytes: Int64)? {
+        guard let parsed = CloudTargetID.parse(targetID),
+              let provider = service.provider(forID: parsed.providerID),
+              let account = (try? provider.restoreAccounts())?.first(where: {
+                  $0.accountID == parsed.accountID
+              }),
+              let quota = try? await provider.quota(for: account) else {
+            return nil
+        }
+        // Free space reckons against the whole account's usage (Google quota
+        // is shared with Gmail/Photos); Drive-only usage is the fallback.
+        return (quota.totalBytes, quota.accountUsedBytes ?? quota.usedBytes)
+    }
+
     var scanService: any ScanEventStreaming {
         CloudScanServiceAdapter(service: service)
     }

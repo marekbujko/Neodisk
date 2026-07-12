@@ -26,6 +26,10 @@ protocol CloudScanIntegrating: AnyObject {
     var scanService: any ScanEventStreaming { get }
     /// The provider name shown under an account row ("Google Drive").
     func accountSubtitle(forTargetID targetID: String) -> String?
+    /// The account's storage quota, for the free-space cell: total capacity
+    /// (nil for unlimited plans) and the bytes counted against it across the
+    /// whole account. nil when the account is gone or the provider can't say.
+    func quota(forTargetID targetID: String) async -> (totalBytes: Int64?, usedBytes: Int64)?
 
     /// True when at least one provider can be connected interactively (its
     /// OAuth client is configured). Drives whether the sidebar shows the

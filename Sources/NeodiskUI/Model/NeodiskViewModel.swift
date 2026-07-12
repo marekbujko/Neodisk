@@ -246,6 +246,9 @@ final class NeodiskViewModel {
     /// The CloudScan integration, or nil in builds without the feature. Owns
     /// the sidebar's connected accounts and the cloud scan stream.
     @ObservationIgnored private(set) var cloudScan: (any CloudScanIntegrating)?
+    /// Last-known quota per cloud account, so the free-space cell renders
+    /// immediately on reselect while a fresh figure is fetched.
+    @ObservationIgnored private var cloudQuotaByTargetID: [String: (totalBytes: Int64?, usedBytes: Int64)] = [:]
 
     init(
         coordinator: ScanCoordinator = ScanCoordinator(),
@@ -785,6 +788,10 @@ final class NeodiskViewModel {
     }
 
     private func updateFreeSpace() {
+        if coordinator.selectedTarget?.kind == .cloud {
+            updateCloudFreeSpace()
+            return
+        }
         guard let target = coordinator.selectedTarget,
               target.kind == .volume else {
             freeSpaceBytes = nil
@@ -805,6 +812,34 @@ final class NeodiskViewModel {
             availableCapacity: freeSpaceBytes,
             scannedBytes: scannedBytes
         )
+    }
+
+    /// Free space for a cloud account: quota capacity minus the account's
+    /// whole-quota usage. Renders through the same gates as volume free space
+    /// (sunburst always, treemap behind the Settings toggle). There is no
+    /// remote analog of purgeable/hidden space; the scan's own synthetic
+    /// "Unattributed" node covers trash and versions instead.
+    private func updateCloudFreeSpace() {
+        guard let target = coordinator.selectedTarget, target.kind == .cloud else { return }
+        hiddenSpaceBytes = nil
+        freeSpaceBytes = Self.cloudFreeSpaceBytes(quota: cloudQuotaByTargetID[target.id])
+        guard let cloudScan else { return }
+        Task { [weak self] in
+            guard let quota = await cloudScan.quota(forTargetID: target.id),
+                  let self,
+                  self.coordinator.selectedTarget?.id == target.id else { return }
+            self.cloudQuotaByTargetID[target.id] = quota
+            self.freeSpaceBytes = Self.cloudFreeSpaceBytes(quota: quota)
+        }
+    }
+
+    nonisolated static func cloudFreeSpaceBytes(
+        quota: (totalBytes: Int64?, usedBytes: Int64)?
+    ) -> Int64? {
+        // Unknown or unlimited quota → no free-space cell.
+        guard let quota, let total = quota.totalBytes else { return nil }
+        let free = total - quota.usedBytes
+        return free > 0 ? free : nil
     }
 
     /// DaisyDisk-style hidden space: total capacity minus available capacity

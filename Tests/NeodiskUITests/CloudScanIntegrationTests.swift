@@ -179,6 +179,10 @@ private final class FakeCloudScanIntegration: CloudScanIntegrating {
         subtitles[targetID]
     }
 
+    func quota(forTargetID targetID: String) async -> (totalBytes: Int64?, usedBytes: Int64)? {
+        nil
+    }
+
     var canConnectAccounts: Bool { !connectMenu.isEmpty }
 
     var connectMenuItems: [(id: String, title: String)] { connectMenu }
@@ -228,5 +232,16 @@ private struct IsolatedModelEnvironment {
     func tearDown() {
         try? FileManager.default.removeItem(at: cacheDirectory)
         removeTestDefaultsSuite(defaults, named: defaultsSuiteName)
+    }
+}
+
+@Suite struct CloudFreeSpaceTests {
+    @Test func testCloudFreeSpaceFromQuota() {
+        #expect(NeodiskViewModel.cloudFreeSpaceBytes(quota: (totalBytes: 1000, usedBytes: 300)) == 700)
+        // Unlimited plan or unknown quota → no free-space cell.
+        #expect(NeodiskViewModel.cloudFreeSpaceBytes(quota: (totalBytes: nil, usedBytes: 300)) == nil)
+        #expect(NeodiskViewModel.cloudFreeSpaceBytes(quota: nil) == nil)
+        // Over-quota accounts must not render negative free space.
+        #expect(NeodiskViewModel.cloudFreeSpaceBytes(quota: (totalBytes: 100, usedBytes: 300)) == nil)
     }
 }
