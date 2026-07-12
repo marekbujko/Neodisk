@@ -46,11 +46,7 @@ public struct NeodiskApp: App {
         }
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button {
-                    AboutPanel.show()
-                } label: {
-                    Label("About Neodisk", systemImage: "info.circle")
-                }
+                AboutMenuItem()
             }
 
             CommandGroup(after: .appInfo) {
@@ -150,6 +146,28 @@ public struct NeodiskApp: App {
 
         Settings {
             SettingsView(model: model, preferences: preferences, updates: updates)
+        }
+
+        Window("About Neodisk", id: "about") {
+            AboutView()
+                .fixedSize()
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+    }
+}
+
+/// The About menu item needs `openWindow`, which is only available through
+/// the SwiftUI environment — hence a view instead of an inline Button.
+private struct AboutMenuItem: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button {
+            openWindow(id: "about")
+        } label: {
+            Label("About Neodisk", systemImage: "info.circle")
         }
     }
 }
