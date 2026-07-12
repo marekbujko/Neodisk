@@ -13,6 +13,7 @@
 //
 
 import CryptoKit
+import Darwin
 import Foundation
 
 /// One set of files whose contents are byte-identical.
@@ -114,6 +115,36 @@ public enum DuplicateFinder {
             }
         }
 
+        // 2b. Drop candidates whose bytes we must not, or cannot, read before
+        // any file is opened. Cloud placeholders (SF_DATALESS: iCloud, Google
+        // Drive, OneDrive and other File Providers) block on read while the
+        // provider materializes them from the network — slowly, or forever
+        // when offline or throttled — and that read has no cancellation
+        // escape, so a handful of them wedge every hashing worker and the
+        // scan stops progressing. Non-regular files (fifo/socket/device) and
+        // files that vanished since the scan can't be hashed either. A
+        // metadata-only stat decides all three without opening the file, so a
+        // stalled provider can never wedge a worker. A group needs two
+        // distinct readable files left to stay interesting.
+        var skippedUnhashable = 0
+        var readableCandidates: [(size: Int64, nodes: [FileNodeRecord])] = []
+        readableCandidates.reserveCapacity(candidates.count)
+        for (size, nodes) in candidates {
+            try Task.checkCancellation()
+            var readable: [FileNodeRecord] = []
+            for node in nodes {
+                if isHashable(node.path) {
+                    readable.append(node)
+                } else {
+                    skippedUnhashable += 1
+                }
+            }
+            if readable.count >= 2 {
+                readableCandidates.append((size, readable))
+            }
+        }
+        candidates = readableCandidates
+
         let candidateCount = candidates.reduce(0) { $0 + $1.nodes.count }
 
         // Progress is bytes-based and monotonic: the planned total starts
@@ -140,7 +171,7 @@ public enum DuplicateFinder {
             await progress.add(bytes: read)
             return digest
         }
-        var unreadableCount = prefixResults.unreadable.count
+        var unreadableCount = skippedUnhashable + prefixResults.unreadable.count
         await progress.drop(bytes: prefixResults.unreadable.reduce(Int64(0)) {
             // A file that failed its prefix read won't get a full pass either.
             $0 + ($1.size > Int64(prefixHashLength) ? $1.size : 0)
@@ -257,6 +288,23 @@ public enum DuplicateFinder {
             }
         }
         return results
+    }
+
+    /// `st_flags` bit set on File Provider placeholders whose contents are
+    /// not materialized locally (sys/stat.h `SF_DATALESS`). Reading such a
+    /// file forces a network download; we refuse to, so a paused or offline
+    /// provider can't stall the scan.
+    private static let datalessFlag: UInt32 = 0x4000_0000
+
+    /// Metadata-only readiness gate: a candidate is safe to hash only when
+    /// it's a regular file whose bytes are on disk right now. `stat` touches
+    /// inode metadata alone — it never opens the file, never blocks on a
+    /// provider, and never triggers a download.
+    private static func isHashable(_ path: String) -> Bool {
+        var info = stat()
+        guard path.withCString({ stat($0, &info) }) == 0 else { return false }
+        guard (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFREG) else { return false }
+        return info.st_flags & datalessFlag == 0
     }
 
     private static func hashPrefix(of path: String) throws -> String {

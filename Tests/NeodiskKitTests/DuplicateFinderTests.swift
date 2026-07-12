@@ -122,6 +122,71 @@ import Testing
         }
     }
 
+    private func fileNode(url: URL, size: Int64) throws -> FileNodeRecord {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let inode = (attributes[.systemFileNumber] as? UInt64)
+            ?? UInt64(attributes[.systemFileNumber] as? Int ?? 0)
+        return FileNodeRecord(
+            id: url.path,
+            url: url,
+            name: url.lastPathComponent,
+            isDirectory: false,
+            isSymbolicLink: false,
+            allocatedSize: size,
+            logicalSize: size,
+            descendantFileCount: 1,
+            lastModified: nil,
+            fileIdentity: FileIdentity(device: 1, inode: inode),
+            isPackage: false,
+            isAccessible: true,
+            isSelfAccessible: true,
+            isSynthetic: false,
+            isAutoSummarized: false
+        )
+    }
+
+    @Test func nonRegularFilesAreSkippedNotHashed() async throws {
+        try await withTempDirectory { directory in
+            // Two real byte-identical twins that should still pair up.
+            let identical = bytes(seed: 0x5A, count: 2 * Self.megabyte)
+            var children: [FileNodeRecord] = []
+            for name in ["twin-1.bin", "twin-2.bin"] {
+                let url = directory.appending(path: name)
+                try identical.write(to: url)
+                children.append(try fileNode(url: url, size: Int64(identical.count)))
+            }
+
+            // A named pipe reporting the SAME logical size, so it lands in the
+            // twins' same-size group. Opening and reading it would block
+            // forever with no writer; the finder must skip it on the metadata
+            // check and never open it. (This test hangs if the guard regresses.)
+            let fifoURL = directory.appending(path: "pipe.bin")
+            #expect(mkfifo(fifoURL.path, 0o644) == 0)
+            children.append(try fileNode(url: fifoURL, size: Int64(2 * Self.megabyte)))
+
+            let root = FileNodeRecord.directory(
+                id: directory.path,
+                url: directory,
+                name: directory.lastPathComponent,
+                children: children,
+                lastModified: nil,
+                isPackage: false,
+                isAccessible: true
+            )
+            let store = FileTreeStore(
+                root: root,
+                childrenByID: [directory.path: FileTreeStore.sortedChildren(children)]
+            )
+
+            let results = try await DuplicateFinder.findDuplicates(in: store)
+
+            #expect(results.groups.count == 1)
+            #expect(results.groups.first?.nodeIDs.count == 2)
+            // The fifo survived size grouping but was skipped before hashing.
+            #expect(results.unreadableCount == 1)
+        }
+    }
+
     @Test func hardLinksCollapseToOneCopy() async throws {
         try await withTempDirectory { directory in
             let identical = bytes(seed: 0x7A, count: 2 * Self.megabyte)
