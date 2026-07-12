@@ -181,6 +181,7 @@
 "%@ wasted" = "浪费 %@";
 "Back to duplicates" = "返回重复项";
 "%@ files couldn't be read" = "%@ 个文件无法读取";
+"Duplicates computed %@" = "%@计算的重复项";
 
 /* MARK: - Changes tab */
 "Comparing with the previous scan…" = "正在与上次扫描比较…";

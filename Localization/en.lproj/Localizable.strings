@@ -181,6 +181,7 @@
 "%@ wasted" = "%@ wasted";
 "Back to duplicates" = "Back to duplicates";
 "%@ files couldn't be read" = "%@ files couldn't be read";
+"Duplicates computed %@" = "Duplicates computed %@";
 
 /* MARK: - Changes tab */
 "Comparing with the previous scan…" = "Comparing with the previous scan…";

@@ -181,6 +181,7 @@
 "%@ wasted" = "%@ の無駄";
 "Back to duplicates" = "重複の一覧に戻る";
 "%@ files couldn't be read" = "%@ 個のファイルを読み込めませんでした";
+"Duplicates computed %@" = "%@に重複を計算";
 
 /* MARK: - Changes tab */
 "Comparing with the previous scan…" = "前回のスキャンと比較中…";

@@ -181,6 +181,7 @@
 "%@ wasted" = "%@ gaspillés";
 "Back to duplicates" = "Retour aux doublons";
 "%@ files couldn't be read" = "%@ fichiers n'ont pas pu être lus";
+"Duplicates computed %@" = "Doublons calculés %@";
 
 /* MARK: - Changes tab */
 "Comparing with the previous scan…" = "Comparaison avec l'analyse précédente…";

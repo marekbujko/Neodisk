@@ -182,6 +182,7 @@
 "%@ wasted" = "%@ desperdiçados";
 "Back to duplicates" = "Voltar às duplicatas";
 "%@ files couldn't be read" = "%@ arquivos não puderam ser lidos";
+"Duplicates computed %@" = "Duplicados calculados %@";
 
 /* MARK: - Changes tab */
 "Comparing with the previous scan…" = "Comparando com a análise anterior…";

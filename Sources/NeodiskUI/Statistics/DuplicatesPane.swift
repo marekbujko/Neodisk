@@ -16,20 +16,31 @@ struct DuplicatesPane: View {
     let model: NeodiskViewModel
 
     var body: some View {
-        if let group = model.duplicates.openGroup {
-            DuplicateGroupDetailView(model: model, group: group)
-        } else {
-            switch model.duplicates.phase {
-            case .idle:
-                idleView
-            case .scanning:
-                scanningView
-            case .failed(let message):
-                failedView(message)
-            case .finished(let results):
-                DuplicateResultsView(model: model, results: results)
+        Group {
+            if let group = model.duplicates.openGroup {
+                DuplicateGroupDetailView(model: model, group: group)
+            } else {
+                switch model.duplicates.phase {
+                case .idle:
+                    idleView
+                case .scanning:
+                    scanningView
+                case .failed(let message):
+                    failedView(message)
+                case .finished(let results):
+                    DuplicateResultsView(model: model, results: results)
+                }
             }
         }
+        // Fill an idle tab from a persisted result when it comes on screen or a
+        // new snapshot lands; a hit shows the previous run without re-hashing.
+        .task(id: loadTaskID) {
+            model.duplicates.loadIfNeeded()
+        }
+    }
+
+    private var loadTaskID: String {
+        model.coordinator.snapshot?.id.uuidString ?? "none"
     }
 
     private var idleView: some View {
@@ -114,10 +125,18 @@ private struct DuplicateResultsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
-                Text(summaryText)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(summaryText)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if let computedText {
+                        Text(computedText)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
                 Spacer()
                 Button {
                     model.duplicates.startScan()
@@ -174,6 +193,20 @@ private struct DuplicateResultsView: View {
             ),
             results.groups.count.formatted(),
             NeodiskFormatters.size(results.totalWastedBytes)
+        )
+    }
+
+    /// "Duplicates computed 3 minutes ago" — shown once a run is finished (a
+    /// fresh scan or a result loaded from cache), so the age of what's on
+    /// screen is clear and Refresh has an obvious meaning.
+    private var computedText: String? {
+        guard let computedAt = model.duplicates.computedAt else { return nil }
+        return String(
+            format: NSLocalizedString(
+                "Duplicates computed %@",
+                comment: "Duplicates results header; %@ is a relative date"
+            ),
+            DisplayFormatters.relativeDate(computedAt)
         )
     }
 
