@@ -443,7 +443,7 @@ struct SunburstPane: View {
     private func contextMenu(for segment: SunburstSegment) -> NSMenu? {
         guard let nodeID = segment.nodeID,
               let node = model.store?.node(id: nodeID),
-              node.supportsFileActions else { return nil }
+              model.supportsFileActions(node) else { return nil }
 
         let model = model
         let menu = NSMenu()

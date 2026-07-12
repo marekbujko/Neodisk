@@ -169,7 +169,7 @@ struct SunburstLegendList: View {
     private func contextMenuItems(for row: SunburstLegendRow) -> some View {
         if case .node(let nodeID, _) = row.target,
            let node = model.store?.node(id: nodeID),
-           node.supportsFileActions {
+           model.supportsFileActions(node) {
             Button("Reveal in Finder") { model.reveal(node) }
             Button("Open") { model.open(node) }
             Button("Copy Path") { model.copyPath(node) }
