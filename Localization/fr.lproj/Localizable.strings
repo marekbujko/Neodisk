@@ -300,3 +300,8 @@
 "Support" = "Soutenir";
 "License" = "Licence";
 "Version %@" = "Version %@";
+
+// Cloud Drives (remote CloudScan)
+"Cloud Drives" = "Disques cloud";
+"Duplicate detection isn't available for cloud drives" = "La détection des doublons n'est pas disponible pour les disques cloud";
+"Finding duplicates reads each file's contents, which only works for files stored on this Mac." = "La recherche de doublons lit le contenu de chaque fichier, ce qui ne fonctionne que pour les fichiers stockés sur ce Mac.";

@@ -299,3 +299,8 @@
 "Support" = "支持";
 "License" = "许可证";
 "Version %@" = "版本 %@";
+
+// Cloud Drives (remote CloudScan)
+"Cloud Drives" = "云盘";
+"Duplicate detection isn't available for cloud drives" = "云盘不支持重复文件检测";
+"Finding duplicates reads each file's contents, which only works for files stored on this Mac." = "查找重复文件需要读取每个文件的内容，因此仅适用于存储在这台 Mac 上的文件。";

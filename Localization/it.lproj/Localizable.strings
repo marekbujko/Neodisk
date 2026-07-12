@@ -299,3 +299,8 @@
 "Support" = "Sostieni";
 "License" = "Licenza";
 "Version %@" = "Versione %@";
+
+// Cloud Drives (remote CloudScan)
+"Cloud Drives" = "Unità cloud";
+"Duplicate detection isn't available for cloud drives" = "Il rilevamento dei duplicati non è disponibile per le unità cloud";
+"Finding duplicates reads each file's contents, which only works for files stored on this Mac." = "La ricerca dei duplicati legge il contenuto di ogni file, il che funziona solo per i file archiviati su questo Mac.";

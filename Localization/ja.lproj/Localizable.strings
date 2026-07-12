@@ -299,3 +299,8 @@
 "Support" = "支援";
 "License" = "ライセンス";
 "Version %@" = "バージョン %@";
+
+// Cloud Drives (remote CloudScan)
+"Cloud Drives" = "クラウドドライブ";
+"Duplicate detection isn't available for cloud drives" = "クラウドドライブでは重複検出を利用できません";
+"Finding duplicates reads each file's contents, which only works for files stored on this Mac." = "重複の検出は各ファイルの内容を読み取るため、このMacに保存されているファイルでのみ機能します。";
