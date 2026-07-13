@@ -54,7 +54,8 @@ struct SunburstLegendList: View {
                         ),
                         isHeader: true,
                         isSelected: false,
-                        isHighlighted: false
+                        isHighlighted: false,
+                        reservesCloudGlyphSlot: model.showsCloudOnlyFiles
                     )
                     .padding(.top, 10)
                     .padding(.bottom, 4)
@@ -137,7 +138,8 @@ struct SunburstLegendList: View {
             row: row,
             isHeader: false,
             isSelected: isSelected(row),
-            isHighlighted: isHighlighted
+            isHighlighted: isHighlighted,
+            reservesCloudGlyphSlot: model.showsCloudOnlyFiles
         )
         .contentShape(Rectangle())
         .onHover { isHovering in
@@ -231,6 +233,9 @@ private struct LegendRowView: View {
     let isHeader: Bool
     let isSelected: Bool
     let isHighlighted: Bool
+    /// Reserve the trailing glyph slot on every row (the cloud-only toggle
+    /// is on), so sizes right-align whether or not a row shows the glyph.
+    var reservesCloudGlyphSlot: Bool = false
 
     var body: some View {
         HStack(spacing: 9) {
@@ -243,15 +248,17 @@ private struct LegendRowView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 8)
-            if row.showsCloudGlyph {
-                Image(systemName: "cloud")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(isHeader ? .primary : .secondary)
-            }
             Text(verbatim: NeodiskFormatters.size(row.size))
                 .font(sizeFont)
                 .monospacedDigit()
                 .foregroundStyle(isHeader ? .primary : .secondary)
+            if reservesCloudGlyphSlot {
+                Image(systemName: "cloud")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(isHeader ? .primary : .secondary)
+                    .opacity(row.showsCloudGlyph ? 1 : 0)
+                    .frame(width: FileSizeLabel.glyphSlotWidth)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, isHeader ? 6 : 4)

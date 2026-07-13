@@ -131,9 +131,6 @@ private enum OutlineRowMetrics {
         return maxWidth.rounded(.up)
     }
 
-    /// Width of FileSizeLabel's cloud glyph plus its 3pt gap.
-    private static let cloudGlyphWidth: CGFloat = 15
-
     static func clusterWidth(
         for row: NeodiskViewModel.OutlineRow, baseline: ScanSizeBaseline?,
         includeCloudOnly: Bool
@@ -143,8 +140,9 @@ private enum OutlineRowMetrics {
             font: sizeFont,
             cachePrefix: "s:"
         )
-        if includeCloudOnly && row.node.cloudOnlyLogicalSize > 0 {
-            width += cloudGlyphWidth
+        if includeCloudOnly {
+            // FileSizeLabel reserves its trailing glyph slot on every row.
+            width += FileSizeLabel.glyphSlotWidth + 3
         }
         if let baseline {
             width += cachedWidth(

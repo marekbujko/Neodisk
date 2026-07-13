@@ -15,19 +15,27 @@ import NeodiskKit
 /// color language), name, dimmed containing folder, size.
 /// Size text for file rows: the same number the visualizations weight by.
 /// With the cloud-only toggle on, a node whose bytes live (partly) in the
-/// cloud shows the combined size behind a small cloud glyph; off, rows show
-/// the plain on-disk size — matching the map, where cloud-only tiles vanish.
+/// cloud shows the combined size with a small cloud glyph after it; off,
+/// rows show the plain on-disk size — matching the map, where cloud-only
+/// tiles vanish. The glyph sits in a fixed trailing slot that stays (empty)
+/// on fully-local rows, so size digits right-align down a list.
 struct FileSizeLabel: View {
+    /// Width of the trailing glyph slot; OutlineRowMetrics mirrors it (plus
+    /// the 3pt gap) when measuring the outline's trailing cluster.
+    static let glyphSlotWidth: CGFloat = 12
+
     let node: FileNodeRecord
     let includeCloudOnly: Bool
 
     var body: some View {
         HStack(spacing: 3) {
-            if includeCloudOnly && node.cloudOnlyLogicalSize > 0 {
+            Text(NeodiskFormatters.size(node.displayWeight(includingCloudOnly: includeCloudOnly)))
+            if includeCloudOnly {
                 Image(systemName: "cloud")
                     .font(.system(size: 9, weight: .medium))
+                    .opacity(node.cloudOnlyLogicalSize > 0 ? 1 : 0)
+                    .frame(width: Self.glyphSlotWidth)
             }
-            Text(NeodiskFormatters.size(node.displayWeight(includingCloudOnly: includeCloudOnly)))
         }
     }
 }
