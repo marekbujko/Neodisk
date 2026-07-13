@@ -318,11 +318,15 @@ private struct VolumeCapacityBar: View {
 
     let data: VolumeBarData
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The segment (or free track) the pointer is over; shows the tooltip.
     @State private var hoveredSegmentID: String?
     /// Measured bubble size; the tooltip stays invisible until the first
     /// measurement lands so it never flashes at an unclamped position.
     @State private var tooltipSize: CGSize = .zero
+    /// Pending delayed unhover; sliding across adjacent segments cancels it
+    /// so the bubble never contracts and re-expands mid-bar.
+    @State private var unhoverTask: Task<Void, Never>?
 
     var body: some View {
         GeometryReader { geometry in
@@ -354,11 +358,30 @@ private struct VolumeCapacityBar: View {
         .onPreferenceChange(VolumeBarTooltipSizeKey.self) { tooltipSize = $0 }
     }
 
+    /// Entering expands the bubble (animated insertion); leaving contracts
+    /// it after a short grace period, so hopping to the next segment (whose
+    /// enter event may arrive after this one's exit) repositions the bubble
+    /// instead of replaying the contract/expand cycle.
     private func hover(_ id: String, isHovering: Bool) {
         if isHovering {
-            hoveredSegmentID = id
+            unhoverTask?.cancel()
+            unhoverTask = nil
+            if hoveredSegmentID == nil {
+                withAnimation(reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.28)) {
+                    hoveredSegmentID = id
+                }
+            } else {
+                hoveredSegmentID = id
+            }
         } else if hoveredSegmentID == id {
-            hoveredSegmentID = nil
+            unhoverTask?.cancel()
+            unhoverTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(70))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeIn(duration: 0.14)) {
+                    hoveredSegmentID = nil
+                }
+            }
         }
     }
 
@@ -397,10 +420,11 @@ private struct VolumeCapacityBar: View {
     private func tooltip(info: HoverInfo, barWidth: CGFloat) -> some View {
         let width = tooltipSize.width
         let offsetX = min(max(info.midX - (width / 2), 0), max(barWidth - width, 0))
+        let tailX = width > 0 ? info.midX - offsetX : nil
         return VolumeBarTooltip(
             label: info.label,
             size: info.size,
-            tailX: width > 0 ? info.midX - offsetX : nil
+            tailX: tailX
         )
         .fixedSize()
         .background(GeometryReader { proxy in
@@ -408,7 +432,20 @@ private struct VolumeCapacityBar: View {
         })
         .offset(x: offsetX, y: -(tooltipSize.height + Self.tooltipGap))
         .opacity(tooltipSize == .zero ? 0 : 1)
+        .transition(bubbleTransition(tailX: tailX, width: width))
         .allowsHitTesting(false)
+    }
+
+    /// Expand on hover / contract on unhover, growing out of the tail tip
+    /// with a fade. Reduce Motion keeps just the fade.
+    private func bubbleTransition(tailX: CGFloat?, width: CGFloat) -> AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        let anchor: UnitPoint = if let tailX, width > 0 {
+            UnitPoint(x: tailX / width, y: 1)
+        } else {
+            .bottom
+        }
+        return .scale(scale: 0.35, anchor: anchor).combined(with: .opacity)
     }
 }
 
