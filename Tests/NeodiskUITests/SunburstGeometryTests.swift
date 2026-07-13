@@ -618,6 +618,76 @@ import NeodiskKit
         #expect(staleSegment.fillRGB == VizPalette.standard.ageRGB(.older))
     }
 
+    // MARK: - Cloud-only weighting & dataless marking (Neodisk-specific)
+
+    @Test func cloudOnlyToggleGrowsDatalessArcWeightAndMarksIt() throws {
+        let local = makeTestFileNode(id: "/root/local", name: "local", size: 100)
+        let cloud = makeDatalessFileNode(id: "/root/cloud", name: "cloud", cloudBytes: 100)
+        let store = makeGeometryStore(children: [local, cloud])
+
+        let off = SunburstLayout.segments(
+            in: store, rootID: "/root", depthLimit: 1, includeCloudOnly: false
+        )
+        let on = SunburstLayout.segments(
+            in: store, rootID: "/root", depthLimit: 1, includeCloudOnly: true
+        )
+
+        let cloudOff = try #require(off.first { $0.nodeID == cloud.id })
+        let cloudOn = try #require(on.first { $0.nodeID == cloud.id })
+        let localOff = try #require(off.first { $0.nodeID == local.id })
+        let localOn = try #require(on.first { $0.nodeID == local.id })
+
+        func span(_ segment: SunburstSegment) -> Double { segment.endAngle - segment.startAngle }
+
+        // Off counts on-disk bytes only, so the dataless file is a sliver and
+        // the local file owns nearly the whole circle. On adds the cloud
+        // bytes, so the equal-logical-size arcs split the circle evenly.
+        #expect(span(cloudOn) > span(cloudOff))
+        #expect(span(localOn) < span(localOff))
+        #expect(abs(span(cloudOn) - span(localOn)) < 0.0001)
+        #expect(abs(span(cloudOn) - .pi) < 0.0001)
+
+        // The dataless bit rides the segment in both modes (it drives the
+        // dashed stroke); the local file never carries it.
+        #expect(cloudOn.isDataless)
+        #expect(cloudOff.isDataless)
+        #expect(!localOn.isDataless)
+        #expect(!localOff.isDataless)
+    }
+
+    @Test func entirelyCloudOnlyDirectoryIsMarkedAndDrillsOnlyWithToggle() throws {
+        let cloudFile = makeDatalessFileNode(id: "/root/cloud/movie", name: "movie", cloudBytes: 200)
+        let cloudDir = makeTestDirectoryNode(id: "/root/cloud", name: "cloud", children: [cloudFile])
+        let local = makeTestFileNode(id: "/root/local", name: "local", size: 100)
+        let root = makeTestDirectoryNode(id: "/root", name: "root", children: [cloudDir, local])
+        let store = FileTreeStore(root: root, childrenByID: [
+            "/root": [cloudDir, local],
+            "/root/cloud": [cloudFile],
+        ])
+
+        // The directory holds no local bytes, only cloud-only descendants.
+        #expect(cloudDir.allocatedSize == 0)
+        #expect(cloudDir.cloudOnlyLogicalSize == 200)
+
+        let off = SunburstLayout.segments(
+            in: store, rootID: "/root", depthLimit: 3, includeCloudOnly: false
+        )
+        let on = SunburstLayout.segments(
+            in: store, rootID: "/root", depthLimit: 3, includeCloudOnly: true
+        )
+
+        // A directory whose bytes all live in the cloud gets the dashed
+        // marker, and with the toggle on it has the weight to drill so its
+        // cloud child renders in the inner ring.
+        let dirOn = try #require(on.first { $0.nodeID == cloudDir.id })
+        #expect(dirOn.isDataless)
+        #expect(on.contains { $0.nodeID == cloudFile.id })
+
+        // With the toggle off the directory carries no on-disk weight, so
+        // nothing recurses into it.
+        #expect(!off.contains { $0.nodeID == cloudFile.id })
+    }
+
     // MARK: - Angular seam
 
     @Test func drawnArcsInsetHalfTheSeamPerEdge() {
@@ -665,6 +735,32 @@ import NeodiskKit
 private func makeGeometryStore(children: [FileNodeRecord]) -> FileTreeStore {
     let root = makeTestDirectoryNode(id: "/root", name: "root", children: children)
     return FileTreeStore(root: root, childrenByID: ["/root": children])
+}
+
+/// A dataless (cloud-only) file: no on-disk bytes, `cloudBytes` of logical
+/// content that lives only in the cloud. Local to this suite so the shared
+/// TestFixtures stay untouched.
+private func makeDatalessFileNode(id: String, name: String, cloudBytes: Int64) -> FileNodeRecord {
+    FileNodeRecord(
+        id: id,
+        url: URL(filePath: id),
+        name: name,
+        isDirectory: false,
+        isSymbolicLink: false,
+        allocatedSize: 0,
+        unduplicatedAllocatedSize: nil,
+        logicalSize: cloudBytes,
+        descendantFileCount: 1,
+        lastModified: nil,
+        fileIdentity: nil,
+        linkCount: 1,
+        isPackage: false,
+        isAccessible: true,
+        isSelfAccessible: true,
+        isSynthetic: false,
+        isAutoSummarized: false,
+        isDataless: true
+    )
 }
 
 private func pointInside(segment: SunburstSegment, in size: CGSize) -> CGPoint {

@@ -66,7 +66,8 @@ extension SunburstLayout {
         style: SunburstColorStyle = SunburstColorStyle(),
         freeSpaceBytes: Int64? = nil,
         hiddenSpaceBytes: Int64? = nil,
-        expandedAggregateIDs: Set<String> = []
+        expandedAggregateIDs: Set<String> = [],
+        includeCloudOnly: Bool = false
     ) -> [SunburstSegment] {
         let unstyled = (try? segments(
             in: treeStore,
@@ -76,6 +77,7 @@ extension SunburstLayout {
             freeSpaceBytes: freeSpaceBytes,
             hiddenSpaceBytes: hiddenSpaceBytes,
             expandedAggregateIDs: expandedAggregateIDs,
+            includeCloudOnly: includeCloudOnly,
             freeSpaceLabel: NSLocalizedString("Free Space", comment: "Sunburst free-space segment label"),
             hiddenSpaceLabel: NSLocalizedString("Hidden Space", comment: "Sunburst hidden-space segment label"),
             cancellationCheck: {}

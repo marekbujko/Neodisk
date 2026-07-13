@@ -51,12 +51,14 @@ struct SunburstPane: View {
                         rootID: rootID,
                         freeSpaceBytes: freeSpaceBytes,
                         hiddenSpaceBytes: hiddenSpaceBytes,
-                        expandedAggregateIDs: model.expandedAggregateIDs
+                        expandedAggregateIDs: model.expandedAggregateIDs,
+                        includeCloudOnly: model.showsCloudOnlyFiles
                     ),
                     style: style,
                     freeSpaceBytes: freeSpaceBytes,
                     hiddenSpaceBytes: hiddenSpaceBytes,
                     expandedAggregateIDs: model.expandedAggregateIDs,
+                    includeCloudOnly: model.showsCloudOnlyFiles,
                     centerSizeText: NeodiskFormatters.size(displayedFolder.allocatedSize),
                     onHoverSegment: { handleHover($0) },
                     onClickSegment: { handleClick($0) },
@@ -156,7 +158,8 @@ struct SunburstPane: View {
         rootID: String,
         freeSpaceBytes: Int64?,
         hiddenSpaceBytes: Int64?,
-        expandedAggregateIDs: Set<String>
+        expandedAggregateIDs: Set<String>,
+        includeCloudOnly: Bool
     ) -> String {
         [
             snapshotID.uuidString,
@@ -164,7 +167,8 @@ struct SunburstPane: View {
             "\(depthLimit)",
             "\(freeSpaceBytes ?? 0)",
             "\(hiddenSpaceBytes ?? 0)",
-            expandedAggregateIDs.sorted().joined(separator: "+")
+            expandedAggregateIDs.sorted().joined(separator: "+"),
+            includeCloudOnly ? "cloud" : "local"
         ].joined(separator: "|")
     }
 

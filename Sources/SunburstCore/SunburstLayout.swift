@@ -56,6 +56,7 @@ public enum SunburstLayout {
         freeSpaceBytes: Int64? = nil,
         hiddenSpaceBytes: Int64? = nil,
         expandedAggregateIDs: Set<String> = [],
+        includeCloudOnly: Bool = false,
         freeSpaceLabel: String = "Free Space",
         hiddenSpaceLabel: String = "Hidden Space",
         cancellationCheck: CancellationCheck
@@ -74,8 +75,11 @@ public enum SunburstLayout {
         // the synthetic arcs.
         let freeBytes = max(freeSpaceBytes ?? 0, 0)
         let hiddenBytes = max(hiddenSpaceBytes ?? 0, 0)
-        let childUnitTotal = visibleChildren.reduce(Int64(0)) { $0 + max($1.allocatedSize, 1) }
-        let allocatedDenominator = max(max(root.allocatedSize, Int64(visibleChildren.count)), childUnitTotal)
+        let childUnitTotal = visibleChildren.reduce(Int64(0)) {
+            $0 + max($1.displayWeight(includingCloudOnly: includeCloudOnly), 1)
+        }
+        let rootWeight = root.displayWeight(includingCloudOnly: includeCloudOnly)
+        let allocatedDenominator = max(max(rootWeight, Int64(visibleChildren.count)), childUnitTotal)
         let denominator = allocatedDenominator + freeBytes + hiddenBytes
         let colorBranchContext = ColorBranchContext(rootChildIDs: rootColorBranchIDs(in: treeStore))
 
@@ -95,6 +99,7 @@ public enum SunburstLayout {
             colorBranchContext: colorBranchContext,
             minimumAngle: minimumAngle,
             expandedAggregateIDs: expandedAggregateIDs,
+            includeCloudOnly: includeCloudOnly,
             cancellationCheck: cancellationCheck,
             into: &result
         )
@@ -152,6 +157,7 @@ public enum SunburstLayout {
         colorBranchContext: ColorBranchContext,
         minimumAngle: Double,
         expandedAggregateIDs: Set<String>,
+        includeCloudOnly: Bool,
         cancellationCheck: CancellationCheck,
         into segments: inout [SunburstSegment]
     ) throws {
@@ -159,7 +165,7 @@ public enum SunburstLayout {
 
         try cancellationCheck()
         let effectiveChildTotal = children.reduce(Int64(0)) { total, child in
-            total + max(child.allocatedSize, 1)
+            total + max(child.displayWeight(includingCloudOnly: includeCloudOnly), 1)
         }
         let safeDenominator = max(parentDenominator, effectiveChildTotal)
         let totalAngle = endAngle - startAngle
@@ -173,6 +179,7 @@ public enum SunburstLayout {
             // individually, however thin (mirrors the treemap's
             // expandAggregate contract).
             disableAggregation: expandedAggregateIDs.contains(parentID),
+            includeCloudOnly: includeCloudOnly,
             cancellationCheck: cancellationCheck
         )
 
@@ -215,6 +222,7 @@ public enum SunburstLayout {
                 colorToken: colorToken,
                 totalSize: entry.totalSize,
                 isAggregate: entry.isAggregate,
+                isDataless: entry.isDataless,
                 parentFolderID: entry.isAggregate ? parentID : nil,
                 itemCount: entry.itemCount
             )
@@ -223,7 +231,7 @@ public enum SunburstLayout {
             if let node = entry.node,
                depth + 1 < depthLimit,
                node.isDirectory,
-               node.allocatedSize > 0 {
+               node.displayWeight(includingCloudOnly: includeCloudOnly) > 0 {
                 let childNodes = try treeStore.children(of: node.id, cancellationCheck: cancellationCheck)
                 guard !childNodes.isEmpty else {
                     cursor = segmentEnd
@@ -234,7 +242,7 @@ public enum SunburstLayout {
                     in: treeStore,
                     children: childNodes,
                     parentID: node.id,
-                    parentDenominator: node.allocatedSize,
+                    parentDenominator: node.displayWeight(includingCloudOnly: includeCloudOnly),
                     startAngle: cursor,
                     endAngle: segmentEnd,
                     depth: depth + 1,
@@ -245,6 +253,7 @@ public enum SunburstLayout {
                     colorBranchContext: colorBranchContext,
                     minimumAngle: minimumAngle,
                     expandedAggregateIDs: expandedAggregateIDs,
+                    includeCloudOnly: includeCloudOnly,
                     cancellationCheck: cancellationCheck,
                     into: &segments
                 )
@@ -261,10 +270,11 @@ public enum SunburstLayout {
         totalAngle: Double,
         minimumAngle: Double,
         disableAggregation: Bool,
+        includeCloudOnly: Bool,
         cancellationCheck: CancellationCheck
     ) throws -> [GroupEntry<Node>] {
         guard children.count > 1, !disableAggregation else {
-            return children.map { GroupEntry(node: $0) }
+            return children.map { GroupEntry(node: $0, includeCloudOnly: includeCloudOnly) }
         }
 
         var visible: [GroupEntry<Node>] = []
@@ -273,13 +283,13 @@ public enum SunburstLayout {
 
         for child in children {
             try cancellationCheck()
-            let size = max(child.allocatedSize, 1)
+            let size = max(child.displayWeight(includingCloudOnly: includeCloudOnly), 1)
             let angle = totalAngle * (Double(size) / Double(max(denominator, 1)))
             if angle < minimumAngle {
                 groupedNodes.append(child)
                 groupedSize += size
             } else {
-                visible.append(GroupEntry(node: child))
+                visible.append(GroupEntry(node: child, includeCloudOnly: includeCloudOnly))
             }
         }
 
@@ -302,7 +312,7 @@ public enum SunburstLayout {
                 itemCount: itemCount
             ))
         } else if let onlyGrouped = groupedNodes.first {
-            visible.append(GroupEntry(node: onlyGrouped))
+            visible.append(GroupEntry(node: onlyGrouped, includeCloudOnly: includeCloudOnly))
         }
 
         return visible
@@ -400,6 +410,7 @@ public enum SunburstLayout {
         let label: String
         let totalSize: Int64
         let isAggregate: Bool
+        let isDataless: Bool
         let colorID: String
         let node: Node?
         let itemCount: Int
@@ -410,6 +421,7 @@ public enum SunburstLayout {
             label: String,
             totalSize: Int64,
             isAggregate: Bool,
+            isDataless: Bool = false,
             colorID: String,
             node: Node?,
             itemCount: Int
@@ -419,18 +431,23 @@ public enum SunburstLayout {
             self.label = label
             self.totalSize = totalSize
             self.isAggregate = isAggregate
+            self.isDataless = isDataless
             self.colorID = colorID
             self.node = node
             self.itemCount = itemCount
         }
 
-        init(node: Node) {
+        init(node: Node, includeCloudOnly: Bool) {
             self.init(
                 id: node.id,
                 nodeID: node.id,
                 label: node.name,
-                totalSize: max(node.allocatedSize, 1),
+                totalSize: max(node.displayWeight(includingCloudOnly: includeCloudOnly), 1),
                 isAggregate: false,
+                // A dataless file, or a directory whose bytes are all in the
+                // cloud (no local content) — the dashed cloud-only arc.
+                isDataless: node.isDataless
+                    || (node.cloudOnlyLogicalSize > 0 && node.allocatedSize == 0),
                 colorID: node.id,
                 node: node,
                 itemCount: 0

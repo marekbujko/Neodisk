@@ -18,6 +18,27 @@ public protocol SunburstNode {
     var isPackage: Bool { get }
     var allocatedSize: Int64 { get }
     var descendantFileCount: Int { get }
+    /// This node's cloud-only (dataless) descendant bytes: a dataless file's
+    /// logical size, or a directory's cloud-only descendant sum; zero for a
+    /// fully-local node. FileNodeRecord already carries it, so its
+    /// conformance stays declaration-only.
+    var cloudOnlyLogicalSize: Int64 { get }
+    /// Whether this leaf is a dataless (cloud-only) file — content lives in
+    /// the cloud, ~0 bytes on disk. Always false for directories.
+    var isDataless: Bool { get }
+    /// The arc's angular weight: `allocatedSize` (on-disk bytes) plus the
+    /// cloud-only bytes below when `includingCloudOnly` is on, so the toggle
+    /// grows dataless arcs to their full logical size. One definition shared
+    /// with the treemap (FileNodeRecord implements it).
+    func displayWeight(includingCloudOnly: Bool) -> Int64
+}
+
+public extension SunburstNode {
+    /// Off-platform conformers (the wasm demo tree) that don't model cloud
+    /// files get the on-disk weight and no dataless treatment.
+    var cloudOnlyLogicalSize: Int64 { 0 }
+    var isDataless: Bool { false }
+    func displayWeight(includingCloudOnly: Bool) -> Int64 { allocatedSize }
 }
 
 /// Read-only tree access for the layout, grouping, and branch-hue math. The

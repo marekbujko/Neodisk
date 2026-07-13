@@ -28,6 +28,11 @@ public struct SunburstSegment: Identifiable, Hashable, Sendable {
     public var fillRGB: SIMD3<Float>?
     public let totalSize: Int64
     public let isAggregate: Bool
+    /// Cloud-only (dataless): a dataless file, or a directory whose bytes all
+    /// live in the cloud (no local content). Drives the dashed hairline arc
+    /// treatment; independent of fill so it survives a restyle and works over
+    /// both branch and kind/age coloring.
+    public let isDataless: Bool
     /// For aggregate segments: the folder whose small children pooled here,
     /// so hover can report "N smaller items in <folder>".
     public let parentFolderID: String?
@@ -48,6 +53,7 @@ public struct SunburstSegment: Identifiable, Hashable, Sendable {
         fillRGB: SIMD3<Float>? = nil,
         totalSize: Int64,
         isAggregate: Bool,
+        isDataless: Bool = false,
         parentFolderID: String? = nil,
         itemCount: Int = 0
     ) {
@@ -63,6 +69,7 @@ public struct SunburstSegment: Identifiable, Hashable, Sendable {
         self.fillRGB = fillRGB
         self.totalSize = totalSize
         self.isAggregate = isAggregate
+        self.isDataless = isDataless
         self.parentFolderID = parentFolderID
         self.itemCount = itemCount
     }

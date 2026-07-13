@@ -303,6 +303,6 @@ struct SunburstZoomTransitionCanvas: View {
         let path = SunburstRenderer.path(for: arc, in: size)
         let style = SunburstChartStyler.baseStyle(for: segment, effectiveDepth: effectiveDepth)
         context.fill(path, with: .color(style.fillColor))
-        context.stroke(path, with: .color(style.strokeColor), lineWidth: style.strokeWidth)
+        context.stroke(path, with: .color(style.strokeColor), style: style.strokeStyle)
     }
 }

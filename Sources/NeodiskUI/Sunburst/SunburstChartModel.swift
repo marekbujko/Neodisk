@@ -25,6 +25,9 @@ struct SunburstLayoutRequest: Sendable {
     let freeSpaceBytes: Int64?
     let hiddenSpaceBytes: Int64?
     let expandedAggregateIDs: Set<String>
+    /// Whether dataless (cloud-only) bytes count toward each arc's weight —
+    /// the toolbar toggle. A geometry input, so it is part of `layoutID`.
+    let includeCloudOnly: Bool
     /// Identity of this layout's geometry inputs; a changed id supersedes
     /// older loads.
     let layoutID: String
@@ -44,6 +47,7 @@ actor SunburstLayoutService: SunburstLayouting {
             freeSpaceBytes: request.freeSpaceBytes,
             hiddenSpaceBytes: request.hiddenSpaceBytes,
             expandedAggregateIDs: request.expandedAggregateIDs,
+            includeCloudOnly: request.includeCloudOnly,
             freeSpaceLabel: NSLocalizedString("Free Space", comment: "Sunburst free-space segment label"),
             hiddenSpaceLabel: NSLocalizedString("Hidden Space", comment: "Sunburst hidden-space segment label"),
             cancellationCheck: Task.checkCancellation

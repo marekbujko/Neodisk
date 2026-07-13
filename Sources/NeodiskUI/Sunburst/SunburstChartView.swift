@@ -35,6 +35,9 @@ struct SunburstChartView: View {
     /// Folders whose "Smaller Items" pool the user clicked open — their
     /// children lay out individually. Part of the layout identity.
     let expandedAggregateIDs: Set<String>
+    /// Whether cloud-only (dataless) bytes count toward arc weights — the
+    /// toolbar toggle. Part of the layout identity.
+    let includeCloudOnly: Bool
     /// Formatted total size of the displayed folder, shown in the center
     /// hole (the hover-preview folder while the chart hovers a directory).
     let centerSizeText: String
@@ -97,6 +100,7 @@ struct SunburstChartView: View {
                         freeSpaceBytes: freeSpaceBytes,
                         hiddenSpaceBytes: hiddenSpaceBytes,
                         expandedAggregateIDs: expandedAggregateIDs,
+                        includeCloudOnly: includeCloudOnly,
                         layoutID: layoutID
                     ))
                 }
@@ -309,11 +313,12 @@ struct SunburstChartView: View {
             return
         }
 
-        // layoutID is "snapshot|root|depth|freeSpace|hiddenSpace" (see
-        // SunburstPane).
+        // layoutID is "snapshot|root|depth|freeSpace|hiddenSpace|aggregates|
+        // cloudOnly" (see SunburstPane); only the snapshot [0] and root [1]
+        // fields drive the zoom.
         let previousParts = fromLayoutID.split(separator: "|", omittingEmptySubsequences: false)
         let nextParts = toLayoutID.split(separator: "|", omittingEmptySubsequences: false)
-        guard previousParts.count == 6, nextParts.count == 6,
+        guard previousParts.count == 7, nextParts.count == 7,
               previousParts[0] == nextParts[0],
               previousParts[1] != nextParts[1] else {
             zoomTransition = nil

@@ -15,13 +15,42 @@ struct SunburstSegmentDrawingStyle {
     let fillOpacity: Double
     let strokeColor: Color
     let strokeWidth: CGFloat
+    /// Dash pattern for the arc stroke, nil for a solid stroke. Set only for
+    /// cloud-only (dataless) arcs — a subtle dashed hairline, no fill change,
+    /// so it reads the same over branch and kind/age coloring and under the
+    /// colorblind palette (dash is texture, not hue).
+    var dash: [CGFloat]?
+
+    init(
+        fillBaseColor: Color,
+        fillOpacity: Double,
+        strokeColor: Color,
+        strokeWidth: CGFloat,
+        dash: [CGFloat]? = nil
+    ) {
+        self.fillBaseColor = fillBaseColor
+        self.fillOpacity = fillOpacity
+        self.strokeColor = strokeColor
+        self.strokeWidth = strokeWidth
+        self.dash = dash
+    }
 
     var fillColor: Color {
         fillBaseColor.opacity(fillOpacity)
     }
+
+    /// SwiftUI stroke style — dashed when `dash` is set, otherwise a plain
+    /// solid stroke of the same width.
+    var strokeStyle: StrokeStyle {
+        StrokeStyle(lineWidth: strokeWidth, dash: dash ?? [])
+    }
 }
 
 enum SunburstChartStyler {
+    /// Cloud-only arcs: a fine dashed hairline over the normal fill. Short
+    /// dash, short gap — subtle at any arc thickness and free of the moiré a
+    /// hatch fill would throw on thin rings.
+    private static let datalessDash: [CGFloat] = [3, 2]
     static func baseStyle(
         for segment: SunburstSegment
     ) -> SunburstSegmentDrawingStyle {
@@ -49,8 +78,13 @@ enum SunburstChartStyler {
         return SunburstSegmentDrawingStyle(
             fillBaseColor: baseColor(for: segment),
             fillOpacity: baseOpacity,
-            strokeColor: Color(nsColor: .separatorColor).opacity(0.4),
-            strokeWidth: 1
+            // Cloud-only arcs keep the ring's separator hairline but dash it
+            // and lift the opacity a touch so the pattern reads; the dash is
+            // the only mark distinguishing them, so it must survive light and
+            // dark and every coloring mode.
+            strokeColor: Color(nsColor: .separatorColor).opacity(segment.isDataless ? 0.7 : 0.4),
+            strokeWidth: 1,
+            dash: segment.isDataless ? Self.datalessDash : nil
         )
     }
 

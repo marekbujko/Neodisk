@@ -167,6 +167,7 @@ import NeodiskKit
             freeSpaceBytes: nil,
             hiddenSpaceBytes: nil,
             expandedAggregateIDs: [],
+            includeCloudOnly: false,
             layoutID: "layout"
         ))
         #expect(didApplyLayout)
@@ -321,6 +322,7 @@ private func makeRequest(layoutID: String) -> SunburstLayoutRequest {
         freeSpaceBytes: nil,
         hiddenSpaceBytes: nil,
         expandedAggregateIDs: [],
+        includeCloudOnly: false,
         layoutID: layoutID
     )
 }
