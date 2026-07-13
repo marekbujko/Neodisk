@@ -38,6 +38,11 @@ nonisolated enum ScanSnapshotCodec {
         var directoryCount: Int
         var accessibleItemCount: Int
         var inaccessibleItemCount: Int
+        /// `ScanChangeList.contentDigest` of the tree, so a save can tell an
+        /// unchanged rescan from a real change without decoding the old
+        /// file's payload. Optional: files written before the field existed
+        /// decode as nil (JSON metadata is additive) and simply never match.
+        var changeDigest: String?
     }
 
     private struct NodeFlags: OptionSet {
@@ -69,8 +74,14 @@ nonisolated enum ScanSnapshotCodec {
     }
 
     /// The explicit-version variant exists so tests can produce old-format
-    /// files and prove they still load.
-    static func encode(_ snapshot: ScanSnapshot, version: UInt32) throws -> Data {
+    /// files and prove they still load. `changeDigest` lets a caller that
+    /// already computed the tree's content digest pass it in; otherwise it
+    /// is computed here.
+    static func encode(
+        _ snapshot: ScanSnapshot,
+        version: UInt32,
+        changeDigest: String? = nil
+    ) throws -> Data {
         let store = snapshot.treeStore
         let stats = snapshot.aggregateStats
         let metadata = Metadata(
@@ -85,7 +96,8 @@ nonisolated enum ScanSnapshotCodec {
             fileCount: stats.fileCount,
             directoryCount: stats.directoryCount,
             accessibleItemCount: stats.accessibleItemCount,
-            inaccessibleItemCount: stats.inaccessibleItemCount
+            inaccessibleItemCount: stats.inaccessibleItemCount,
+            changeDigest: changeDigest ?? ScanChangeList.contentDigest(of: store)
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970

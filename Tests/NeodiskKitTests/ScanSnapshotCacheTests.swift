@@ -192,6 +192,106 @@ import Testing
         #expect(rotated.treeStore.node(id: firstFile.id) == nil)
     }
 
+    @Test func testUnchangedContentSaveKeepsPreviousBaseline() async throws {
+        let cacheDirectory = makeTemporaryCacheDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        let cache = ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false)
+        let target = makeTestTarget("/cache/unchanged")
+
+        try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100)]))
+        let changed = try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 300)]))
+        #expect(changed.rotatedPrevious)
+        #expect(changed.hasPreviousSnapshot)
+
+        // A content-identical rescan becomes the latest (fresh scan date)
+        // but skips the rotation: the previous slot keeps the older baseline
+        // instead of a same-content copy that would diff to nothing.
+        let rescanDate = Date(timeIntervalSinceReferenceDate: 777_000_000)
+        let unchanged = try await cache.save(makeFileSnapshot(
+            target: target, files: [("a.bin", 300)], finishedAt: rescanDate
+        ))
+        #expect(!unchanged.rotatedPrevious)
+        #expect(unchanged.hasPreviousSnapshot)
+
+        let latest = try #require(await cache.loadSnapshot(for: target))
+        let latestFinishedAt = try #require(latest.finishedAt)
+        #expect(abs(latestFinishedAt.timeIntervalSince(rescanDate)) < 0.01)
+        let previous = try #require(await cache.loadPreviousSnapshot(for: target))
+        #expect(previous.treeStore.node(id: target.id + "/a.bin")?.allocatedSize == 100)
+    }
+
+    @Test func testUnchangedFirstRescanCreatesNoPreviousSnapshot() async throws {
+        let cacheDirectory = makeTemporaryCacheDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        let cache = ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false)
+        let target = makeTestTarget("/cache/unchanged-first")
+
+        let first = try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100)]))
+        #expect(!first.rotatedPrevious)
+        #expect(!first.hasPreviousSnapshot)
+
+        let rescan = try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100)]))
+        #expect(!rescan.rotatedPrevious)
+        #expect(!rescan.hasPreviousSnapshot)
+        #expect(await cache.loadPreviousSnapshot(for: target) == nil)
+    }
+
+    @Test func testTimestampOnlyChangesDoNotRotate() async throws {
+        let cacheDirectory = makeTemporaryCacheDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        let cache = ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false)
+        let target = makeTestTarget("/cache/touched")
+
+        // The change surfaces never read lastModified, so a scan differing
+        // only there must count as unchanged — rotating it in would destroy
+        // the baseline to show an empty diff.
+        func snapshot(modified: Date) -> ScanSnapshot {
+            let file = makeTestFileNode(
+                id: target.id + "/a.bin", name: "a.bin", size: 100, lastModified: modified
+            )
+            let root = makeTestDirectoryNode(id: target.id, name: "touched", children: [file])
+            let store = FileTreeStore(root: root, childrenByID: [root.id: [file]])
+            return makeTestSnapshot(target: target, root: root, store: store)
+        }
+        try await cache.save(snapshot(modified: Date(timeIntervalSinceReferenceDate: 1_000)))
+        let outcome = try await cache.save(
+            snapshot(modified: Date(timeIntervalSinceReferenceDate: 2_000))
+        )
+        #expect(!outcome.rotatedPrevious)
+        #expect(await cache.loadPreviousSnapshot(for: target) == nil)
+    }
+
+    @Test func testDigestlessLatestFileStillRotates() async throws {
+        let cacheDirectory = makeTemporaryCacheDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        let cache = ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false)
+        let target = makeTestTarget("/cache/pre-digest")
+
+        // Strip the digest from the saved file's metadata JSON, simulating a
+        // file written before the field existed: an identical rescan can't
+        // prove it is unchanged, so it rotates like it always did.
+        try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100)]))
+        let latestURL = try #require(singleCacheFileURL(in: cacheDirectory))
+        let data = try Data(contentsOf: latestURL)
+        let metadataLength = data.subdata(in: 8..<12).withUnsafeBytes {
+            Int(UInt32(littleEndian: $0.load(as: UInt32.self)))
+        }
+        var json = try #require(try JSONSerialization.jsonObject(
+            with: data.subdata(in: 12..<(12 + metadataLength))
+        ) as? [String: Any])
+        #expect(json.removeValue(forKey: "changeDigest") != nil)
+        let strippedMetadata = try JSONSerialization.data(withJSONObject: json)
+        var rebuilt = data.prefix(8)
+        rebuilt.append(withUnsafeBytes(of: UInt32(strippedMetadata.count).littleEndian) { Data($0) })
+        rebuilt.append(strippedMetadata)
+        rebuilt.append(data.suffix(from: 12 + metadataLength))
+        try rebuilt.write(to: latestURL)
+
+        let outcome = try await cache.save(makeFileSnapshot(target: target, files: [("a.bin", 100)]))
+        #expect(outcome.rotatedPrevious)
+        #expect(await cache.loadPreviousSnapshot(for: target) != nil)
+    }
+
     @Test func testPruneDeletesBothSlotsOfRemovedTargets() async throws {
         let cacheDirectory = makeTemporaryCacheDirectory()
         defer { try? FileManager.default.removeItem(at: cacheDirectory) }
@@ -199,7 +299,8 @@ import Testing
 
         let orphan = makeRichSnapshot(rootPath: "/cache/gone")
         try await cache.save(orphan)
-        try await cache.save(orphan)
+        // A changed rescan, so the first save rotates into the previous slot.
+        try await cache.save(makeFileSnapshot(target: orphan.target, files: [("grew.bin", 7)]))
         let kept = makeRichSnapshot(rootPath: "/cache/kept-both")
         try await cache.save(kept)
 
@@ -218,7 +319,8 @@ import Testing
         let snapshot = makeRichSnapshot(rootPath: "/cache/broken-latest")
 
         try await cache.save(snapshot)
-        try await cache.save(snapshot)
+        // A changed rescan, so the first save rotates into the previous slot.
+        try await cache.save(makeFileSnapshot(target: snapshot.target, files: [("grew.bin", 7)]))
         let latestURL = try #require(
             cacheFileURLs(in: cacheDirectory).first { !$0.lastPathComponent.contains(".prev.") }
         )
@@ -239,7 +341,8 @@ import Testing
         let snapshot = makeRichSnapshot(rootPath: "/cache/both-slots")
 
         try await cache.save(snapshot)
-        try await cache.save(snapshot)
+        // A changed rescan, so the first save rotates into the previous slot.
+        try await cache.save(makeFileSnapshot(target: snapshot.target, files: [("grew.bin", 7)]))
         #expect(await cache.loadPreviousSnapshot(for: snapshot.target) != nil)
 
         await cache.removeSnapshot(forTargetID: snapshot.target.id)
@@ -528,9 +631,15 @@ import Testing
         return FileTreeStore(root: root, childrenByID: [root.id: children])
     }
 
-    private func makeFileSnapshot(target: ScanTarget, files: [(String, Int64)]) -> ScanSnapshot {
+    private func makeFileSnapshot(
+        target: ScanTarget,
+        files: [(String, Int64)],
+        finishedAt: Date = Date()
+    ) -> ScanSnapshot {
         let store = makeFileStore(target: target, files: files)
-        return makeTestSnapshot(target: target, root: store.root, store: store)
+        return makeTestSnapshot(
+            target: target, root: store.root, store: store, finishedAt: finishedAt
+        )
     }
 
     private func makeEmptyList() -> ScanChangeList {

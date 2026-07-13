@@ -29,6 +29,7 @@
 //    added+deleted; hard-linked files (shared identity) are never matched.
 //
 
+import CryptoKit
 import Foundation
 
 /// One row of the changes list.
@@ -366,6 +367,47 @@ public struct ScanChangeList: Sendable, Equatable, Codable {
             removedBytes: removedBytes,
             renamedCount: renamedCount
         )
+    }
+
+    /// A digest of exactly the tree content the change surfaces read: per
+    /// node (in preorder) its ID, allocated size, file identity, link count,
+    /// and synthetic flag. Two stores with equal digests produce an empty
+    /// change list and an all-zero `ScanSizeBaseline` delta, which is what
+    /// lets the snapshot cache keep the previous slot's older baseline
+    /// instead of rotating in a content-identical rescan. Timestamps and
+    /// other display-only fields are deliberately excluded — a scan that
+    /// only touched them would otherwise destroy the baseline to show an
+    /// empty diff.
+    public static func contentDigest(of store: FileTreeStore) -> String {
+        var hasher = SHA256()
+        func updateInteger<T: FixedWidthInteger>(_ value: T) {
+            withUnsafeBytes(of: value.littleEndian) { hasher.update(bufferPointer: $0) }
+        }
+        for node in store.storage.nodes {
+            var id = node.id
+            // Length-prefixed: IDs can contain any byte (synthetic nodes
+            // embed NUL), so a separator can't delimit them.
+            id.withUTF8 { idBytes in
+                updateInteger(UInt64(idBytes.count))
+                hasher.update(bufferPointer: UnsafeRawBufferPointer(idBytes))
+            }
+            updateInteger(node.allocatedSize)
+            updateInteger(node.linkCount)
+            updateInteger(node.isSynthetic ? UInt8(1) : UInt8(0))
+            switch node.fileIdentity {
+            case nil:
+                updateInteger(UInt8(0))
+            case .fileSystem(let device, let inode):
+                updateInteger(UInt8(1))
+                updateInteger(device)
+                updateInteger(inode)
+            case .resourceIdentifier(let data):
+                updateInteger(UInt8(2))
+                updateInteger(UInt64(data.count))
+                hasher.update(data: data)
+            }
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     private static let ambiguousIndex: Int32 = -1

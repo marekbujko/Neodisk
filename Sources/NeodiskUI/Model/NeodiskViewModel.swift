@@ -692,9 +692,11 @@ final class NeodiskViewModel {
 
     private func persistCompletedSnapshot(_ snapshot: ScanSnapshot) {
         guard snapshot.isComplete, snapshot.source.isPersistable else { return }
-        // Saving rotates any existing latest snapshot into the previous
-        // slot, so this target has a diffable previous scan from now on if
-        // it had a cache entry before.
+        // Saving usually rotates any existing latest snapshot into the
+        // previous slot, so this target likely has a diffable previous scan
+        // from now on if it had a cache entry before. Optimistic: an
+        // unchanged rescan skips the rotation, and the save's outcome
+        // corrects the entry (see saveSnapshotToCache).
         let hadCachedSnapshot = cachedScanInfo[snapshot.target.id] != nil
         cachedScanInfo[snapshot.target.id] = CachedScanInfo(
             lastScanDate: snapshot.finishedAt ?? Date(),
@@ -713,8 +715,9 @@ final class NeodiskViewModel {
     /// takes (the duration drives the auto-rescan decision) and the
     /// sidebar's "Scanned … ago" keeps describing the full scan. Only the
     /// node count is refreshed. Saving still rotates the pre-splice
-    /// snapshot into the previous slot, which keeps diffing meaningful:
-    /// "what changed since before this refresh".
+    /// snapshot into the previous slot (unless the splice changed nothing),
+    /// which keeps diffing meaningful: "what changed since before this
+    /// refresh".
     private func persistSplicedSnapshot() {
         guard let snapshot = coordinator.snapshot,
               snapshot.isComplete, snapshot.source.isPersistable else { return }
@@ -731,13 +734,27 @@ final class NeodiskViewModel {
     private func saveSnapshotToCache(_ snapshot: ScanSnapshot) {
         Task { [weak self, snapshotCache] in
             do {
-                try await snapshotCache.save(snapshot)
-                // Saving rotated the displayed scan's predecessor; an
-                // active diff of this target must rebase on it, and an
-                // inactive one may prefetch its baseline. A loaded Changes
-                // list compares against the replaced generation too.
-                self?.diff.snapshotWasRotated(for: snapshot.target)
-                self?.changes.snapshotWasRotated(for: snapshot.target)
+                let outcome = try await snapshotCache.save(snapshot)
+                // The optimistic index entry guessed hasPreviousSnapshot
+                // from "was there a cache entry"; the save knows the truth
+                // (an unchanged rescan skips the rotation, so a target's
+                // first rescan may leave the previous slot empty).
+                self?.setHasPreviousSnapshot(
+                    outcome.hasPreviousSnapshot, forTargetID: snapshot.target.id
+                )
+                if outcome.rotatedPrevious {
+                    // Saving rotated the displayed scan's predecessor; an
+                    // active diff of this target must rebase on it, and an
+                    // inactive one may prefetch its baseline. A loaded Changes
+                    // list compares against the replaced generation too.
+                    self?.diff.snapshotWasRotated(for: snapshot.target)
+                    self?.changes.snapshotWasRotated(for: snapshot.target)
+                } else {
+                    // Content-identical rescan: the previous slot (and any
+                    // loaded baseline) still describes the right generation.
+                    // Prefetch it for the fresh tree like a restore would.
+                    self?.diff.snapshotWasRestored(for: snapshot.target)
+                }
                 // Kind stats ride along so the next restore of this
                 // snapshot starts with a colored map.
                 await Self.saveKindStatsSidecar(for: snapshot, in: snapshotCache)
@@ -957,12 +974,17 @@ final class NeodiskViewModel {
     /// The previous snapshot of a target turned out to be unreadable or
     /// gone; reflect that in the cache index so the diff toggle disables.
     func markPreviousSnapshotMissing(forTargetID targetID: String) {
-        guard let info = cachedScanInfo[targetID] else { return }
+        setHasPreviousSnapshot(false, forTargetID: targetID)
+    }
+
+    private func setHasPreviousSnapshot(_ hasPrevious: Bool, forTargetID targetID: String) {
+        guard let info = cachedScanInfo[targetID],
+              info.hasPreviousSnapshot != hasPrevious else { return }
         cachedScanInfo[targetID] = CachedScanInfo(
             lastScanDate: info.lastScanDate,
             lastScanDuration: info.lastScanDuration,
             nodeCount: info.nodeCount,
-            hasPreviousSnapshot: false
+            hasPreviousSnapshot: hasPrevious
         )
     }
 

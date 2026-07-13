@@ -7,7 +7,9 @@
 //
 //  Each target keeps its latest scan (<hash>.ndscan) plus the one before it
 //  (<hash>.prev.ndscan, rotated on save — the basis for "what grew since
-//  last scan" diffs) in ~/Library/Application Support/Neodisk/ScanCache/,
+//  last scan" diffs; a save whose tree content matches the latest skips the
+//  rotation, so an unchanged rescan keeps the older baseline instead of
+//  making the diff empty) in ~/Library/Application Support/Neodisk/ScanCache/,
 //  named by a hash of the target path (the app runs unbundled, so the
 //  directory is created explicitly rather than derived from a bundle
 //  identifier). The format is versioned; corrupt or old-version files are
@@ -52,6 +54,14 @@ public struct CachedScanInfo: Sendable {
     }
 }
 
+/// What a save did to the cache slots: whether the prior latest rotated
+/// into the previous slot, and whether a previous snapshot exists at all
+/// afterwards (the truth behind `CachedScanInfo.hasPreviousSnapshot`).
+public struct SnapshotSaveOutcome: Sendable {
+    public let rotatedPrevious: Bool
+    public let hasPreviousSnapshot: Bool
+}
+
 public actor ScanSnapshotCache {
     static let currentFormatVersion: UInt32 = 2
     static let oldestReadableFormatVersion: UInt32 = 1
@@ -84,22 +94,38 @@ public actor ScanSnapshotCache {
 
     /// Persists a completed snapshot as the latest cached scan for its
     /// target. The prior latest file (if any) rotates to the "previous"
-    /// slot, so the last two scans per location are always available for
-    /// diffing; anything older is dropped.
-    public func save(_ snapshot: ScanSnapshot) throws {
+    /// slot, so the last two *different* scans per location are available
+    /// for diffing; anything older is dropped. A snapshot whose tree
+    /// content matches the current latest still becomes the latest (fresh
+    /// scan date and duration) but skips the rotation — rotating an
+    /// identical tree would make every diff empty and destroy the baseline
+    /// the rescan was meant to be compared against.
+    @discardableResult
+    public func save(_ snapshot: ScanSnapshot) throws -> SnapshotSaveOutcome {
         guard snapshot.isComplete else {
             throw ScanSnapshotCacheError.incompleteSnapshot
         }
 
         let start = ContinuousClock.now
-        let data = try ScanSnapshotCodec.encode(snapshot)
+        let digest = ScanChangeList.contentDigest(of: snapshot.treeStore)
+        let data = try ScanSnapshotCodec.encode(
+            snapshot,
+            version: Self.currentFormatVersion,
+            changeDigest: digest
+        )
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
 
         let latestURL = fileURL(forTargetID: snapshot.target.id)
         let previousURL = previousFileURL(forTargetID: snapshot.target.id)
+        var rotatedPrevious = false
         if FileManager.default.fileExists(atPath: latestURL.path) {
-            try? FileManager.default.removeItem(at: previousURL)
-            try? FileManager.default.moveItem(at: latestURL, to: previousURL)
+            if latestMatches(digest: digest, targetID: snapshot.target.id, at: latestURL) {
+                log("content unchanged for \(snapshot.target.id); keeping previous baseline")
+            } else {
+                try? FileManager.default.removeItem(at: previousURL)
+                try? FileManager.default.moveItem(at: latestURL, to: previousURL)
+                rotatedPrevious = true
+            }
         }
 
         try data.write(to: latestURL, options: .atomic)
@@ -107,6 +133,21 @@ public actor ScanSnapshotCache {
             "saved \(snapshot.treeStore.nodeCount) nodes (\(data.count) bytes) for "
             + "\(snapshot.target.id) in \(elapsedDescription(since: start))"
         )
+        return SnapshotSaveOutcome(
+            rotatedPrevious: rotatedPrevious,
+            hasPreviousSnapshot: FileManager.default.fileExists(atPath: previousURL.path)
+        )
+    }
+
+    /// True when the latest cache file records the same change-significant
+    /// tree content (and target — filename hash collisions never match).
+    /// Header-only read; files from before the digest existed, or ones that
+    /// fail to read, never match and rotate as before.
+    private func latestMatches(digest: String, targetID: String, at url: URL) -> Bool {
+        guard let metadata = try? ScanSnapshotCodec.readMetadata(fromFileAt: url) else {
+            return false
+        }
+        return metadata.targetPath == targetID && metadata.changeDigest == digest
     }
 
     /// Returns the cached snapshot for a target, or nil when there is none.

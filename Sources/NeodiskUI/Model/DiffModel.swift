@@ -134,12 +134,14 @@ final class DiffModel {
         }
     }
 
-    /// A saved snapshot was put on screen without a rescan, so no scan
-    /// finish will prefetch for it. With the Changes tab on screen the
-    /// baseline loads (and shows) right away; otherwise, with the
-    /// preference on, prefetch so the tab answers instantly later.
-    /// `snapshotDidChange` already ran for the restored snapshot, so there
-    /// is no stale prefetch or in-flight load to worry about.
+    /// A snapshot landed on screen without rotating the previous slot — a
+    /// saved snapshot restored without a rescan, or a rescan whose content
+    /// matched the latest (the save skipped the rotation) — so no rotation
+    /// will prefetch for it. With the Changes tab on screen the baseline
+    /// loads (and shows) right away; otherwise, with the preference on,
+    /// prefetch so the tab answers instantly later. `snapshotDidChange`
+    /// already ran for the displayed snapshot, so there is no stale
+    /// prefetch or in-flight load to worry about.
     func snapshotWasRestored(for target: ScanTarget) {
         guard coordinator.snapshot?.target.id == target.id,
               baseline == nil, !isLoading, canShow else { return }

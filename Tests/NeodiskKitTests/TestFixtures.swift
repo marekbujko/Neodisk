@@ -61,13 +61,15 @@ func makeTestSnapshot(
     target: ScanTarget? = nil,
     root: FileNodeRecord,
     store: FileTreeStore,
-    warnings: [ScanWarning] = []
+    warnings: [ScanWarning] = [],
+    startedAt: Date = Date(),
+    finishedAt: Date = Date()
 ) -> ScanSnapshot {
     ScanSnapshot(
         target: target ?? ScanTarget(url: root.url),
         treeStore: store,
-        startedAt: Date(),
-        finishedAt: Date(),
+        startedAt: startedAt,
+        finishedAt: finishedAt,
         scanWarnings: warnings,
         aggregateStats: store.aggregateStats,
         isComplete: true
