@@ -306,6 +306,8 @@
 "Duplicate detection isn't available for cloud drives" = "クラウドドライブでは重複検出を利用できません";
 "Finding duplicates reads each file's contents, which only works for files stored on this Mac." = "重複の検出は各ファイルの内容を読み取るため、このMacに保存されているファイルでのみ機能します。";
 "Connect Google Drive…" = "Google Driveに接続…";
+"Google Drive: coming soon" = "Google Drive: 近日対応";
+"Cloud drive scanning is coming in an upcoming update" = "クラウドドライブのスキャンは今後のアップデートで対応予定です";
 "Connect Cloud Drive…" = "クラウドドライブに接続…";
 "Sign Out…" = "サインアウト…";
 "Sign out of this cloud drive?" = "このクラウドドライブからサインアウトしますか？";

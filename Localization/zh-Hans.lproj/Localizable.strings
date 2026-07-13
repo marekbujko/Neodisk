@@ -306,6 +306,8 @@
 "Duplicate detection isn't available for cloud drives" = "云盘不支持重复文件检测";
 "Finding duplicates reads each file's contents, which only works for files stored on this Mac." = "查找重复文件需要读取每个文件的内容，因此仅适用于存储在这台 Mac 上的文件。";
 "Connect Google Drive…" = "连接 Google 云端硬盘…";
+"Google Drive: coming soon" = "Google Drive：即将推出";
+"Cloud drive scanning is coming in an upcoming update" = "云盘扫描将在未来的更新中推出";
 "Connect Cloud Drive…" = "连接云盘…";
 "Sign Out…" = "退出登录…";
 "Sign out of this cloud drive?" = "要退出此云盘吗？";

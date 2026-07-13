@@ -307,6 +307,8 @@
 "Duplicate detection isn't available for cloud drives" = "La detección de duplicados no está disponible para unidades en la nube";
 "Finding duplicates reads each file's contents, which only works for files stored on this Mac." = "La búsqueda de duplicados lee el contenido de cada archivo, lo que solo funciona con archivos almacenados en este Mac.";
 "Connect Google Drive…" = "Conectar Google Drive…";
+"Google Drive: coming soon" = "Google Drive: próximamente";
+"Cloud drive scanning is coming in an upcoming update" = "El análisis de unidades en la nube llegará en una próxima actualización";
 "Connect Cloud Drive…" = "Conectar unidad en la nube…";
 "Sign Out…" = "Cerrar sesión…";
 "Sign out of this cloud drive?" = "¿Cerrar sesión en esta unidad en la nube?";

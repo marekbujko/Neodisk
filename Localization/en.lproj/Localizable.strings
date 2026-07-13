@@ -306,6 +306,8 @@
 "Duplicate detection isn't available for cloud drives" = "Duplicate detection isn't available for cloud drives";
 "Finding duplicates reads each file's contents, which only works for files stored on this Mac." = "Finding duplicates reads each file's contents, which only works for files stored on this Mac.";
 "Connect Google Drive…" = "Connect Google Drive…";
+"Google Drive: coming soon" = "Google Drive: coming soon";
+"Cloud drive scanning is coming in an upcoming update" = "Cloud drive scanning is coming in an upcoming update";
 "Connect Cloud Drive…" = "Connect Cloud Drive…";
 "Sign Out…" = "Sign Out…";
 "Sign out of this cloud drive?" = "Sign out of this cloud drive?";

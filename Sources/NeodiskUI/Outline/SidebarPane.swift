@@ -54,7 +54,7 @@ struct SidebarPane: View {
                 }
             }
 
-            if model.cloudScan?.canConnectAccounts == true || !model.cloudDriveAccounts.isEmpty {
+            if model.cloudScan != nil || !model.cloudDriveAccounts.isEmpty {
                 Section("Cloud Drives") {
                     ForEach(model.cloudDriveAccounts) { target in
                         // No Reveal-in-Finder context menu: cloudscan:// IDs
@@ -193,9 +193,21 @@ struct SidebarPane: View {
     }
 
     /// The Cloud Drives footer button, styled like "Add Folder…". A single
-    /// configured provider is a plain button; multiple become a menu.
+    /// configured provider is a plain button; multiple become a menu. When
+    /// CloudScan is built in but no provider is configured (e.g. a release
+    /// packaged before Google's verification clears), the button shows
+    /// disabled as a "Coming soon" teaser instead of disappearing, per the
+    /// persistent-controls rule in AGENTS.md.
     @ViewBuilder
     private var cloudConnectButton: some View {
+        if let items = model.cloudScan?.connectMenuItems, items.isEmpty {
+            sidebarActionLabel(
+                title: "Google Drive: coming soon",
+                systemImage: "externaldrive.badge.plus"
+            )
+            .foregroundStyle(.secondary)
+            .help("Cloud drive scanning is coming in an upcoming update")
+        }
         if let items = model.cloudScan?.connectMenuItems, !items.isEmpty {
             if items.count == 1 {
                 let item = items[0]
