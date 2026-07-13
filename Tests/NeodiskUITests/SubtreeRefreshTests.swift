@@ -65,7 +65,10 @@ import NeodiskKit
         #expect(model.store?.children(of: spliced.id).map(\.name) == ["Contents"])
         // The menu item disappears once the contents are in the store.
         #expect(model.contentsExpansion(for: spliced) == nil)
-        #expect(model.expandedNodeIDs.contains(fixture.package.id))
+        // The reveal lands a main-actor hop after the splice, so wait for it.
+        try await waitUntilAsync("expansion result revealed") {
+            model.expandedNodeIDs.contains(fixture.package.id)
+        }
         #expect(model.actionErrorMessage == nil)
     }
 
@@ -104,8 +107,11 @@ import NeodiskKit
             model.store?.node(id: fixture.summarized.id)?.isAutoSummarized == false
         }
         #expect(model.store?.children(of: fixture.summarized.id).map(\.name) == ["new1.bin", "new2.bin"])
-        // The replacement root is revealed and opened in the outline.
-        #expect(model.expandedNodeIDs.contains(fixture.summarized.id))
+        // The replacement root is revealed and opened in the outline. The
+        // reveal lands a main-actor hop after the splice, so wait for it.
+        try await waitUntilAsync("expansion result revealed") {
+            model.expandedNodeIDs.contains(fixture.summarized.id)
+        }
         #expect(model.expandedNodeIDs.contains(fixture.snapshot.root.id))
         #expect(model.coordinator.expandingNodeID == nil)
         #expect(model.canRefreshSubtree)
