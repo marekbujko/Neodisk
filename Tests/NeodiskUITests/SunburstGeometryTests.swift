@@ -160,6 +160,38 @@ import NeodiskKit
         #expect(hit?.id == parent.id)
     }
 
+    @Test func hitTestRoundtripsEveryTaperedRingToItsDepth() throws {
+        // A four-deep chain: rings taper outward, so their radial bands are
+        // uneven. Hitting each drawn arc at its own mid-radius must land back
+        // on a segment of that depth — the hit-test bands and the drawn bands
+        // share the one metrics source, so they can never drift apart.
+        let leaf = makeTestFileNode(id: "/root/a/b/c/leaf", name: "leaf", size: 5)
+        let c = makeTestDirectoryNode(id: "/root/a/b/c", name: "c", children: [leaf])
+        let b = makeTestDirectoryNode(id: "/root/a/b", name: "b", children: [c])
+        let a = makeTestDirectoryNode(id: "/root/a", name: "a", children: [b])
+        let root = makeTestDirectoryNode(id: "/root", name: "root", children: [a])
+        let store = FileTreeStore(root: root, childrenByID: [
+            "/root": [a],
+            "/root/a": [b],
+            "/root/a/b": [c],
+            "/root/a/b/c": [leaf],
+        ])
+        let size = CGSize(width: 400, height: 400)
+
+        let segments = SunburstLayout.segments(in: store, rootID: "/root", depthLimit: 4)
+        #expect(Set(segments.map(\.depth)) == [0, 1, 2, 3])
+
+        for segment in segments {
+            let hit = SunburstHitTester.segment(
+                at: pointInside(segment: segment, in: size),
+                in: size,
+                segments: segments
+            )
+            #expect(hit?.depth == segment.depth)
+            #expect(hit?.id == segment.id)
+        }
+    }
+
     @Test func hitTestIndexFindsAngleInUnsortedRing() {
         let size = CGSize(width: 300, height: 300)
         let first = makeSegment(id: "first", startAngle: 0, endAngle: .pi, innerRadius: 0.1, outerRadius: 0.8, depth: 0)

@@ -172,7 +172,8 @@ struct SunburstChartView: View {
             if let zoomTransition, let zoomPresentation {
                 SunburstZoomTransitionCanvas(
                     state: zoomTransition,
-                    presentation: zoomPresentation
+                    presentation: zoomPresentation,
+                    metrics: SunburstRingMetrics(depthLimit: depthLimit)
                 )
                 .frame(width: chartFrame.width, height: chartFrame.height)
                 .position(x: chartFrame.midX, y: chartFrame.midY)

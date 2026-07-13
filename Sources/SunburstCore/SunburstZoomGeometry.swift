@@ -63,7 +63,8 @@ public enum SunburstZoomGeometry {
     /// into the center, and segments outside the arc clamp to zero width.
     public nonisolated static func zoomedArc(
         for segment: SunburstSegment,
-        focus: SunburstSegment
+        focus: SunburstSegment,
+        metrics: SunburstRingMetrics
     ) -> SunburstZoomArc {
         if segment.id == focus.id {
             return SunburstZoomArc(
@@ -79,18 +80,18 @@ public enum SunburstZoomGeometry {
             min(max((radians - focus.startAngle) / span, 0), 1) * .pi * 2
         }
 
-        // The full ring band width — segments draw their outer edge short of
-        // it by the cosmetic ring gap, so add the gap back before re-banding.
-        let ringWidth = (focus.outerRadius + SunburstLayout.ringGap) - focus.innerRadius
-        let relativeDepth = Double(segment.depth - focus.depth - 1)
-        let innerRadius = SunburstLayout.centerRadius + (relativeDepth * ringWidth)
-        let outerRadius = innerRadius + ringWidth - SunburstLayout.ringGap
+        // Descendants shift up `focus.depth + 1` levels, so the focus's child
+        // lands on ring 0. Band it through the tapered metrics at that new
+        // ring index — the same radii the real re-layout (focus as root) will
+        // stamp, so the handoff is an invisible cut. Ancestors land at
+        // negative indices, which metrics extrapolates toward the center.
+        let relativeDepth = segment.depth - focus.depth - 1
 
         return SunburstZoomArc(
             startRadians: remappedRadians(segment.startAngle),
             endRadians: remappedRadians(segment.endAngle),
-            innerRadius: max(0, innerRadius),
-            outerRadius: max(0, outerRadius)
+            innerRadius: max(0, metrics.innerRadius(depth: relativeDepth)),
+            outerRadius: max(0, metrics.drawnOuterRadius(depth: relativeDepth))
         )
     }
 
@@ -109,12 +110,13 @@ public enum SunburstZoomGeometry {
     public nonisolated static func arc(
         for segment: SunburstSegment,
         focus: SunburstSegment,
-        progress rawProgress: Double
+        progress rawProgress: Double,
+        metrics: SunburstRingMetrics
     ) -> SunburstZoomArc {
         let progress = timedProgress(for: segment, focus: focus, rawProgress: rawProgress)
         let identity = identityArc(for: segment)
         guard progress > 0 else { return identity }
-        let zoomed = zoomedArc(for: segment, focus: focus)
+        let zoomed = zoomedArc(for: segment, focus: focus, metrics: metrics)
         guard progress < 1 else { return zoomed }
 
         return SunburstZoomArc(

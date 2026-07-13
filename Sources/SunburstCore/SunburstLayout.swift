@@ -67,8 +67,10 @@ public enum SunburstLayout {
 
         let rootChildren = try treeStore.children(of: root.id, cancellationCheck: cancellationCheck)
         let visibleChildren = rootChildren.isEmpty ? [root] : rootChildren
-        let ringStart = centerRadius
-        let ringWidth = (0.98 - ringStart) / Double(max(depthLimit, 1))
+        // Ring radii — bands taper with depth (deeper rings thinner). Computed
+        // once here and threaded through the recursion; the zoom remap bands
+        // through the same metrics, so drawn and hit-tested arcs agree.
+        let metrics = SunburstRingMetrics(depthLimit: depthLimit)
         // Free and hidden space join the root denominator so the allocated
         // arcs shrink to make room; the child total floor keeps zero-byte
         // children (each counted as at least one unit) from overflowing into
@@ -93,8 +95,7 @@ public enum SunburstLayout {
             endAngle: .pi * 2,
             depth: 0,
             depthLimit: depthLimit,
-            ringStart: ringStart,
-            ringWidth: ringWidth,
+            metrics: metrics,
             branchContext: nil,
             colorBranchContext: colorBranchContext,
             minimumAngle: minimumAngle,
@@ -114,8 +115,8 @@ public enum SunburstLayout {
                 label: hiddenSpaceLabel,
                 startAngle: .pi * 2 - freeAngle - hiddenAngle,
                 endAngle: .pi * 2 - freeAngle,
-                innerRadius: ringStart,
-                outerRadius: ringStart + ringWidth - ringGap,
+                innerRadius: metrics.innerRadius(depth: 0),
+                outerRadius: metrics.drawnOuterRadius(depth: 0),
                 depth: 0,
                 colorToken: .single(id: hiddenSpaceSegmentID, role: .hiddenSpace),
                 totalSize: hiddenBytes,
@@ -129,8 +130,8 @@ public enum SunburstLayout {
                 label: freeSpaceLabel,
                 startAngle: .pi * 2 - freeAngle,
                 endAngle: .pi * 2,
-                innerRadius: ringStart,
-                outerRadius: ringStart + ringWidth - ringGap,
+                innerRadius: metrics.innerRadius(depth: 0),
+                outerRadius: metrics.drawnOuterRadius(depth: 0),
                 depth: 0,
                 colorToken: .single(id: freeSpaceSegmentID, role: .freeSpace),
                 totalSize: freeBytes,
@@ -151,8 +152,7 @@ public enum SunburstLayout {
         endAngle: Double,
         depth: Int,
         depthLimit: Int,
-        ringStart: Double,
-        ringWidth: Double,
+        metrics: SunburstRingMetrics,
         branchContext: ColorBranch?,
         colorBranchContext: ColorBranchContext,
         minimumAngle: Double,
@@ -216,8 +216,8 @@ public enum SunburstLayout {
                 label: entry.label,
                 startAngle: cursor,
                 endAngle: segmentEnd,
-                innerRadius: ringStart + Double(depth) * ringWidth,
-                outerRadius: ringStart + Double(depth + 1) * ringWidth - ringGap,
+                innerRadius: metrics.innerRadius(depth: depth),
+                outerRadius: metrics.drawnOuterRadius(depth: depth),
                 depth: depth,
                 colorToken: colorToken,
                 totalSize: entry.totalSize,
@@ -247,8 +247,7 @@ public enum SunburstLayout {
                     endAngle: segmentEnd,
                     depth: depth + 1,
                     depthLimit: depthLimit,
-                    ringStart: ringStart,
-                    ringWidth: ringWidth,
+                    metrics: metrics,
                     branchContext: branch,
                     colorBranchContext: colorBranchContext,
                     minimumAngle: minimumAngle,

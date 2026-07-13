@@ -179,6 +179,10 @@ struct SunburstZoomPresentation {
 struct SunburstZoomTransitionCanvas: View {
     let state: SunburstZoomTransitionState
     let presentation: SunburstZoomPresentation
+    /// Tapered ring radii, matching the layout's — the remap bands its
+    /// re-depthed arcs through these so the handoff to the real layout is an
+    /// invisible cut.
+    let metrics: SunburstRingMetrics
 
     var body: some View {
         Canvas { context, size in
@@ -262,7 +266,7 @@ struct SunburstZoomTransitionCanvas: View {
             context.opacity = segmentOpacity
             draw(
                 segment,
-                arc: SunburstZoomGeometry.arc(for: segment, focus: focus, progress: progress),
+                arc: SunburstZoomGeometry.arc(for: segment, focus: focus, progress: progress, metrics: metrics),
                 effectiveDepth: SunburstZoomGeometry.effectiveDepth(
                     for: segment,
                     focus: focus,

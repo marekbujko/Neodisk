@@ -14,7 +14,7 @@ import Testing
 @testable import NeodiskUI
 
 @Suite struct SunburstZoomTransitionTests {
-    private let ringWidth: Double = (0.98 - SunburstLayout.centerRadius) / 6
+    private let metrics = SunburstRingMetrics(depthLimit: 6)
 
     private func makeSegment(
         id: String,
@@ -22,15 +22,14 @@ import Testing
         startRadians: Double,
         endRadians: Double
     ) -> SunburstSegment {
-        let inner = SunburstLayout.centerRadius + (Double(depth) * ringWidth)
-        return SunburstSegment(
+        SunburstSegment(
             id: id,
             nodeID: id,
             label: id,
             startAngle: startRadians,
             endAngle: endRadians,
-            innerRadius: inner,
-            outerRadius: inner + ringWidth - SunburstLayout.ringGap,
+            innerRadius: metrics.innerRadius(depth: depth),
+            outerRadius: metrics.drawnOuterRadius(depth: depth),
             depth: depth,
             colorToken: .single(id: id, role: .normal),
             totalSize: 1,
@@ -43,7 +42,7 @@ import Testing
     @Test func focusBecomesCenterDisk() {
         let focus = makeSegment(id: "focus", depth: 0, startRadians: 1, endRadians: 2)
 
-        let arc = SunburstZoomGeometry.zoomedArc(for: focus, focus: focus)
+        let arc = SunburstZoomGeometry.zoomedArc(for: focus, focus: focus, metrics: metrics)
 
         #expect(arc.startRadians == 0)
         #expect(abs(arc.endRadians - .pi * 2) < 0.0001)
@@ -55,19 +54,20 @@ import Testing
         let focus = makeSegment(id: "focus", depth: 0, startRadians: 1, endRadians: 2)
         let child = makeSegment(id: "child", depth: 1, startRadians: 1, endRadians: 2)
 
-        let arc = SunburstZoomGeometry.zoomedArc(for: child, focus: focus)
+        let arc = SunburstZoomGeometry.zoomedArc(for: child, focus: focus, metrics: metrics)
 
         #expect(abs(arc.startRadians) < 0.0001)
         #expect(abs(arc.endRadians - .pi * 2) < 0.0001)
-        #expect(abs(arc.innerRadius - SunburstLayout.centerRadius) < 0.0001)
-        #expect(abs(arc.outerRadius - (SunburstLayout.centerRadius + ringWidth - SunburstLayout.ringGap)) < 0.0001)
+        // The focus's child re-bands onto ring 0 of the tapered metrics.
+        #expect(abs(arc.innerRadius - metrics.innerRadius(depth: 0)) < 0.0001)
+        #expect(abs(arc.outerRadius - metrics.drawnOuterRadius(depth: 0)) < 0.0001)
     }
 
     @Test func descendantAnglesRemapProportionally() {
         let focus = makeSegment(id: "focus", depth: 0, startRadians: 1, endRadians: 3)
         let child = makeSegment(id: "child", depth: 1, startRadians: 1.5, endRadians: 2)
 
-        let arc = SunburstZoomGeometry.zoomedArc(for: child, focus: focus)
+        let arc = SunburstZoomGeometry.zoomedArc(for: child, focus: focus, metrics: metrics)
 
         #expect(abs(arc.startRadians - (.pi * 2 * 0.25)) < 0.0001)
         #expect(abs(arc.endRadians - (.pi * 2 * 0.5)) < 0.0001)
@@ -77,7 +77,7 @@ import Testing
         let focus = makeSegment(id: "focus", depth: 0, startRadians: 1, endRadians: 2)
         let sibling = makeSegment(id: "sibling", depth: 0, startRadians: 3, endRadians: 4)
 
-        let arc = SunburstZoomGeometry.zoomedArc(for: sibling, focus: focus)
+        let arc = SunburstZoomGeometry.zoomedArc(for: sibling, focus: focus, metrics: metrics)
 
         #expect(abs(arc.endRadians - arc.startRadians) < 0.0001)
         #expect(!arc.isDrawable)
@@ -87,7 +87,7 @@ import Testing
         let focus = makeSegment(id: "focus", depth: 2, startRadians: 1, endRadians: 2)
         let ancestor = makeSegment(id: "ancestor", depth: 0, startRadians: 0.5, endRadians: 3)
 
-        let arc = SunburstZoomGeometry.zoomedArc(for: ancestor, focus: focus)
+        let arc = SunburstZoomGeometry.zoomedArc(for: ancestor, focus: focus, metrics: metrics)
 
         // Ancestors end up inside the hole, covered by the focus disk.
         #expect(arc.outerRadius <= SunburstLayout.centerRadius)
@@ -98,7 +98,7 @@ import Testing
         let focus = makeSegment(id: "focus", depth: 0, startRadians: 1, endRadians: 2)
         let child = makeSegment(id: "child", depth: 1, startRadians: 1.2, endRadians: 1.7)
 
-        let arc = SunburstZoomGeometry.arc(for: child, focus: focus, progress: 0)
+        let arc = SunburstZoomGeometry.arc(for: child, focus: focus, progress: 0, metrics: metrics)
 
         #expect(arc == SunburstZoomGeometry.identityArc(for: child))
     }
@@ -122,10 +122,11 @@ import Testing
         let arc = SunburstZoomGeometry.arc(
             for: sibling,
             focus: focus,
-            progress: SunburstZoomGeometry.collapseFinishFraction
+            progress: SunburstZoomGeometry.collapseFinishFraction,
+            metrics: metrics
         )
 
-        #expect(arc == SunburstZoomGeometry.zoomedArc(for: sibling, focus: focus))
+        #expect(arc == SunburstZoomGeometry.zoomedArc(for: sibling, focus: focus, metrics: metrics))
     }
 
     @Test func descendantsHoldStillThroughTheStartDelay() {
@@ -135,7 +136,8 @@ import Testing
         let arc = SunburstZoomGeometry.arc(
             for: child,
             focus: focus,
-            progress: SunburstZoomGeometry.descendantStartFraction * 0.9
+            progress: SunburstZoomGeometry.descendantStartFraction * 0.9,
+            metrics: metrics
         )
 
         #expect(arc == SunburstZoomGeometry.identityArc(for: child))
