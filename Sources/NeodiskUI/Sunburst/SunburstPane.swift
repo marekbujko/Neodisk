@@ -75,7 +75,8 @@ struct SunburstPane: View {
                     chartRootID: rootID,
                     style: style,
                     onHoverRow: { handleRowHover($0) },
-                    onClickRow: { handleRowClick($0) }
+                    onClickRow: { handleRowClick($0) },
+                    onPinchRow: { handleRowPinch($0, direction: $1) }
                 )
             }
             // A new root (drill, breadcrumb, rescan) invalidates the preview.
@@ -425,6 +426,31 @@ struct SunburstPane: View {
             // The synthetic free/hidden-space arcs are not navigable —
             // these rows are hover-highlight only.
             break
+        }
+    }
+
+    /// Pinch on the legend list mirrors the chart's pinch-to-drill: a
+    /// spread over a row drills into that folder (pure navigation, no
+    /// select fallback — see handlePinchDrill), a squeeze anywhere in the
+    /// list goes up one level. The aggregate row drills into its containing
+    /// folder like the pooled segment does; free/hidden-space and file rows
+    /// do nothing.
+    private func handleRowPinch(_ row: SunburstLegendRow?, direction: SunburstPinchDirection) {
+        switch direction {
+        case .drillIn:
+            let targetID: String?
+            switch row?.target {
+            case .node(let nodeID, let isDirectory):
+                targetID = isDirectory ? nodeID : nil
+            case .aggregate:
+                targetID = displayedFolderID
+            case .freeSpace, .hiddenSpace, nil:
+                targetID = nil
+            }
+            guard let targetID, model.drillIn(to: targetID) else { return }
+            model.select(nil)
+        case .drillOut:
+            model.drillOut()
         }
     }
 

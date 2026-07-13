@@ -6,8 +6,8 @@
 //  displayed folder and one row per child, colored exactly like the chart's
 //  segments (rows derive from the rendered layout via SunburstLegend).
 //  Hovering a row highlights its arc in the chart and feeds the status bar;
-//  hovering the chart highlights the containing row here. Clicks and the
-//  context menu mirror the chart's segment interactions.
+//  hovering the chart highlights the containing row here. Clicks, the
+//  context menu, and pinch-to-drill mirror the chart's segment interactions.
 //
 
 import SwiftUI
@@ -25,10 +25,16 @@ struct SunburstLegendList: View {
     let style: SunburstColorStyle
     let onHoverRow: (SunburstLegendRow?) -> Void
     let onClickRow: (SunburstLegendRow) -> Void
+    /// A pinch committed over the list: the hovered row (nil over the
+    /// header or gaps) and the pinch direction, chart-parity semantics.
+    let onPinchRow: (SunburstLegendRow?, SunburstPinchDirection) -> Void
 
     /// The row the pointer is over, tracked locally so a stale exit event
     /// from the previous row cannot clear a newer row's hover.
     @State private var hoveredRowID: String?
+    /// Latched after a pinch commits so one gesture drills exactly once,
+    /// like the chart overlay's didPinchDrill.
+    @State private var pinchDidDrill = false
 
     var body: some View {
         let rows = legendRows
@@ -74,6 +80,40 @@ struct SunburstLegendList: View {
             .transition(.opacity)
         }
         .frame(width: Self.width)
+        .simultaneousGesture(pinchDrillGesture(rows: rows))
+    }
+
+    // MARK: - Pinch to drill
+
+    /// Pinch-to-drill on the list, matching the chart overlay's contract:
+    /// the first threshold crossing commits one drill and latches until the
+    /// fingers lift. The chart commits at an accumulated magnification of
+    /// ±0.1; MagnifyGesture reports the ratio, so 1 ± 0.1 is the same
+    /// finger travel.
+    private func pinchDrillGesture(rows: [SunburstLegendRow]) -> some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                // A cancelled gesture never delivers onEnded; a fresh
+                // gesture restarting near ratio 1 clears the stale latch.
+                if pinchDidDrill, abs(value.magnification - 1) < 0.05 {
+                    pinchDidDrill = false
+                }
+                guard !pinchDidDrill else { return }
+
+                let direction: SunburstPinchDirection
+                if value.magnification >= 1.1 {
+                    direction = .drillIn
+                } else if value.magnification <= 0.9 {
+                    direction = .drillOut
+                } else {
+                    return
+                }
+                pinchDidDrill = true
+                onPinchRow(rows.first { $0.id == hoveredRowID }, direction)
+            }
+            .onEnded { _ in
+                pinchDidDrill = false
+            }
     }
 
     // MARK: - Rows
