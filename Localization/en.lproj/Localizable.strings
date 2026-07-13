@@ -317,3 +317,14 @@
 "Connect a cloud account and keep it in the sidebar" = "Connect a cloud account and keep it in the sidebar";
 "Connect Dropbox…" = "Connect Dropbox…";
 "Connect OneDrive…" = "Connect OneDrive…";
+
+/* MARK: - Cloud-only files */
+"Cloud-Only Files" = "Cloud-Only Files";
+"No cloud-only files in this scan" = "No cloud-only files in this scan";
+"Hide cloud-only files (files not downloaded from your cloud drives)" = "Hide cloud-only files (files not downloaded from your cloud drives)";
+"Show cloud-only files (files not downloaded from your cloud drives)" = "Show cloud-only files (files not downloaded from your cloud drives)";
+"%@ · Cloud-only" = "%@ · Cloud-only";
+"%@ on this Mac · %@ cloud-only" = "%@ on this Mac · %@ cloud-only";
+"Cloud storage" = "Cloud storage";
+"On this Mac" = "On this Mac";
+"Cloud-only" = "Cloud-only";

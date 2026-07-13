@@ -317,3 +317,14 @@
 "Connect a cloud account and keep it in the sidebar" = "Collega un account cloud e tienilo nella barra laterale";
 "Connect Dropbox…" = "Collega Dropbox…";
 "Connect OneDrive…" = "Collega OneDrive…";
+
+/* MARK: - Cloud-only files */
+"Cloud-Only Files" = "File solo cloud";
+"No cloud-only files in this scan" = "Nessun file solo cloud in questa scansione";
+"Hide cloud-only files (files not downloaded from your cloud drives)" = "Nascondi i file solo cloud (file non scaricati dalle tue unità cloud)";
+"Show cloud-only files (files not downloaded from your cloud drives)" = "Mostra i file solo cloud (file non scaricati dalle tue unità cloud)";
+"%@ · Cloud-only" = "%@ · Solo cloud";
+"%@ on this Mac · %@ cloud-only" = "%@ su questo Mac · %@ solo cloud";
+"Cloud storage" = "Spazio cloud";
+"On this Mac" = "Su questo Mac";
+"Cloud-only" = "Solo cloud";

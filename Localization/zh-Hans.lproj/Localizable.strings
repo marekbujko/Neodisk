@@ -317,3 +317,14 @@
 "Connect a cloud account and keep it in the sidebar" = "连接云帐户并将其保留在边栏中";
 "Connect Dropbox…" = "连接 Dropbox…";
 "Connect OneDrive…" = "连接 OneDrive…";
+
+/* MARK: - Cloud-only files */
+"Cloud-Only Files" = "仅云端文件";
+"No cloud-only files in this scan" = "此次扫描中没有仅云端文件";
+"Hide cloud-only files (files not downloaded from your cloud drives)" = "隐藏仅云端文件（未从你的云盘下载的文件）";
+"Show cloud-only files (files not downloaded from your cloud drives)" = "显示仅云端文件（未从你的云盘下载的文件）";
+"%@ · Cloud-only" = "%@ · 仅云端";
+"%@ on this Mac · %@ cloud-only" = "%@ 本 Mac · %@ 仅云端";
+"Cloud storage" = "云存储";
+"On this Mac" = "本 Mac";
+"Cloud-only" = "仅云端";

@@ -71,6 +71,17 @@ struct AnalysisPane: View {
             case .changes:
                 ChangesPane(model: model)
             }
+
+            // Cloud footer under every tab, only when the scan has cloud-only
+            // bytes — keyed off the scanned root, matching what the panes'
+            // totals key off (aggregateStats is the whole-scan root).
+            if model.snapshotHasCloudItems, let store = model.store {
+                Divider()
+                CloudSummaryStrip(
+                    onThisMac: store.root.allocatedSize,
+                    cloudOnly: store.root.cloudOnlyLogicalSize
+                )
+            }
         }
     }
 }

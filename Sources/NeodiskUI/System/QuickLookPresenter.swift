@@ -22,13 +22,15 @@ final class QuickLookPresenter: NSObject {
     static let shared = QuickLookPresenter()
 
     /// A node previews only if it is a real filesystem item (not the
-    /// synthetic "System Data" node) that still exists on disk. The
-    /// existence check is injectable for tests.
+    /// synthetic "System Data" node) that still exists on disk and is not
+    /// cloud-only: previewing a dataless file would force a download, which
+    /// the read-only promise forbids. The existence check is injectable for
+    /// tests.
     nonisolated static func canPreview(
         _ node: FileNodeRecord,
         fileExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
     ) -> Bool {
-        node.supportsFileActions && fileExists(node.path)
+        node.supportsFileActions && !node.isDataless && fileExists(node.path)
     }
 
     /// The single item vended to the panel.

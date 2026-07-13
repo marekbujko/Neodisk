@@ -41,6 +41,29 @@ import NeodiskKit
         #expect(!QuickLookPresenter.canPreview(node, fileExists: { _ in true }))
     }
 
+    @Test func datalessFileIsNeverPreviewableEvenIfPathExists() {
+        // A cloud-only (dataless) file exists on disk as a stub; previewing
+        // it would force a download, which the read-only promise forbids.
+        let node = FileNodeRecord(
+            id: "/tmp/cloud-only.mov",
+            path: "/tmp/cloud-only.mov",
+            name: "cloud-only.mov",
+            isDirectory: false,
+            isSymbolicLink: false,
+            allocatedSize: 0,
+            logicalSize: 5_000_000_000,
+            descendantFileCount: 1,
+            lastModified: nil,
+            isPackage: false,
+            isAccessible: true,
+            isSelfAccessible: true,
+            isSynthetic: false,
+            isAutoSummarized: false,
+            isDataless: true
+        )
+        #expect(!QuickLookPresenter.canPreview(node, fileExists: { _ in true }))
+    }
+
     @Test func defaultExistenceCheckUsesRealFilesystem() {
         let missing = makeTestFileNode(
             id: "/tmp/neodisk-definitely-missing-\(UUID().uuidString)",

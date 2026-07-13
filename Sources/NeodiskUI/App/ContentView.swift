@@ -686,8 +686,10 @@ private struct StatusBar: View {
                 Text(LocalizedStringKey(FileKindClassifier.kind(for: node, mode: model.kinds.displayMode).displayName))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Text(NeodiskFormatters.size(node.allocatedSize))
+                Text(Self.sizeText(for: node))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
             } else {
                 Text("Hover the treemap or select a row to inspect an item.")
                     .foregroundStyle(.secondary)
@@ -697,5 +699,26 @@ private struct StatusBar: View {
         .font(.system(size: 11))
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
+    }
+
+    /// Size for the inspected item, annotated when it carries cloud-only
+    /// (not-downloaded) bytes: a dataless file is ~0 on disk, so its full
+    /// logical size is shown with a qualifier; a folder splits its on-disk
+    /// bytes from the cloud-only bytes below it.
+    private static func sizeText(for node: FileNodeRecord) -> String {
+        if node.isDataless {
+            return String(
+                format: NSLocalizedString("%@ · Cloud-only", comment: "Status bar size for a cloud-only file"),
+                NeodiskFormatters.size(node.logicalSize)
+            )
+        }
+        if node.isDirectory && node.cloudOnlyLogicalSize > 0 {
+            return String(
+                format: NSLocalizedString("%@ on this Mac · %@ cloud-only", comment: "Status bar size for a folder with cloud-only content"),
+                NeodiskFormatters.size(node.allocatedSize),
+                NeodiskFormatters.size(node.cloudOnlyLogicalSize)
+            )
+        }
+        return NeodiskFormatters.size(node.allocatedSize)
     }
 }
