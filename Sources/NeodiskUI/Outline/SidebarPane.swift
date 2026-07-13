@@ -18,6 +18,8 @@ struct SidebarPane: View {
     @State private var selection: Set<String> = []
     @State private var capacityByPath: [String: String] = [:]
     @State private var volumeBars: [String: VolumeBarData] = [:]
+    /// The cloud account a sign-out confirmation is pending for.
+    @State private var signOutTarget: ScanTarget?
 
     /// Sidebar folders, minus any that duplicate a built-in location.
     private var visibleFolders: [ScanTarget] {
@@ -49,6 +51,28 @@ struct SidebarPane: View {
                     ForEach(model.cloudLocations) { target in
                         builtInLocationRow(target, now: now, bar: nil)
                     }
+                }
+            }
+
+            if model.cloudScan?.canConnectAccounts == true || !model.cloudDriveAccounts.isEmpty {
+                Section("Cloud Drives") {
+                    ForEach(model.cloudDriveAccounts) { target in
+                        // No Reveal-in-Finder context menu: cloudscan:// IDs
+                        // are not filesystem paths, so these rows can't reuse
+                        // builtInLocationRow.
+                        SidebarTargetRow(
+                            target: target,
+                            subtitle: model.cloudScan?.accountSubtitle(forTargetID: target.id) ?? target.id,
+                            lastScanned: model.cachedScanInfo[target.id]?.lastScanDate,
+                            now: now
+                        )
+                        .tag(target.id)
+                        .contextMenu {
+                            Button("Sign Out…") { signOutTarget = target }
+                        }
+                    }
+
+                    cloudConnectButton
                 }
             }
 
@@ -87,6 +111,22 @@ struct SidebarPane: View {
         .listStyle(.sidebar)
         .dropDestination(for: URL.self) { urls, _ in
             model.addDroppedFolders(urls)
+        }
+        .confirmationDialog(
+            "Sign out of this cloud drive?",
+            isPresented: Binding(
+                get: { signOutTarget != nil },
+                set: { if !$0 { signOutTarget = nil } }
+            ),
+            presenting: signOutTarget
+        ) { target in
+            Button("Sign Out", role: .destructive) {
+                model.signOutCloudAccount(targetID: target.id)
+                signOutTarget = nil
+            }
+            Button("Cancel", role: .cancel) { signOutTarget = nil }
+        } message: { target in
+            Text("Neodisk will disconnect \(target.displayName) and remove its cached scan. You can reconnect at any time.")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Text("v\(AppVersion.string)")
@@ -150,6 +190,53 @@ struct SidebarPane: View {
 
     private var allTargets: [ScanTarget] {
         model.builtInLocations + visibleFolders
+    }
+
+    /// The Cloud Drives footer button, styled like "Add Folder…". A single
+    /// configured provider is a plain button; multiple become a menu.
+    @ViewBuilder
+    private var cloudConnectButton: some View {
+        if let items = model.cloudScan?.connectMenuItems, !items.isEmpty {
+            if items.count == 1 {
+                let item = items[0]
+                Button {
+                    model.connectCloudAccount(providerID: item.id)
+                } label: {
+                    sidebarActionLabel(title: item.title, systemImage: "externaldrive.badge.plus")
+                }
+                .buttonStyle(.plain)
+                .help("Connect a cloud account and keep it in the sidebar")
+            } else {
+                Menu {
+                    ForEach(items, id: \.id) { item in
+                        Button(LocalizedStringKey(item.title)) { model.connectCloudAccount(providerID: item.id) }
+                    }
+                } label: {
+                    sidebarActionLabel(title: "Connect Cloud Drive…", systemImage: "externaldrive.badge.plus")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .help("Connect a cloud account and keep it in the sidebar")
+            }
+        }
+    }
+
+    /// Shared styling for the sidebar's full-width action buttons (Add
+    /// Folder…, Connect …). The title routes through LocalizedStringKey —
+    /// a String-typed value passed to Label is never localized.
+    private func sidebarActionLabel(title: String, systemImage: String) -> some View {
+        HStack {
+            Spacer()
+            Label(LocalizedStringKey(title), systemImage: systemImage)
+                .font(.system(size: 13, weight: .medium))
+            Spacer()
+        }
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 7)
+                .fill(Color.primary.opacity(0.07))
+        )
+        .contentShape(Rectangle())
     }
 
     /// One row of the Volumes or Local Cloud Files section: not removable,
@@ -584,6 +671,11 @@ private struct SidebarTargetRow: View {
     private var iconName: String {
         if target.kind == .volume {
             return "internaldrive.fill"
+        }
+        // Remote cloud-drive account (CloudScan): distinct from the local
+        // iCloud/Dropbox sync folders below.
+        if target.kind == .cloud {
+            return "externaldrive.badge.icloud"
         }
         if CloudLocationDetector.isCloudPath(target.id) || target.displayName == "Dropbox" {
             return target.displayName.hasPrefix("iCloud") ? "icloud.fill" : "cloud.fill"

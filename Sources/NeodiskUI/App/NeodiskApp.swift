@@ -7,13 +7,24 @@ import AppKit
 import SwiftUI
 
 public struct NeodiskApp: App {
-    @State private var model = NeodiskViewModel()
+    @State private var model: NeodiskViewModel
     @StateObject private var preferences = AppPreferences()
     // Sparkle auto-updates; inert (no updater) for unbundled `swift run`
     // builds and bundles without an appcast feed. See UpdateController.
     @StateObject private var updates = UpdateController()
 
     public init() {
+        // Route cloud-kind targets to the CloudScan service (fixture-fed in
+        // M1; nil in builds without CloudScanKit, where the router's cloud
+        // leg reports the feature as unavailable).
+        let cloudScan = CloudScanFactory.make()
+        _model = State(initialValue: NeodiskViewModel(
+            coordinator: ScanCoordinator(
+                scanService: RoutingScanService(cloudService: cloudScan?.scanService)
+            ),
+            cloudScan: cloudScan
+        ))
+
         // Single-window app: no window tabs, so the View menu loses the
         // useless "Show Tab Bar"/"Show All Tabs" items.
         NSWindow.allowsAutomaticWindowTabbing = false

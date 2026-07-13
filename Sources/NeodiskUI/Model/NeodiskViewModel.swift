@@ -161,9 +161,15 @@ final class NeodiskViewModel {
     /// Locally-synced cloud storage folders (iCloud Drive, File Provider
     /// roots), shown in the sidebar's own "Local Cloud Files" section.
     let cloudLocations = SystemIntegration.cloudTargets()
-    /// The fixed sidebar locations: volumes plus cloud locations. Unlike
-    /// the Folders section these can never be removed.
-    var builtInLocations: [ScanTarget] { volumeLocations + cloudLocations }
+    /// Connected remote cloud-drive accounts (CloudScan), shown in the
+    /// sidebar's "Cloud Drives" section. Seeded once from `cloudScan` at
+    /// launch; empty in builds without the CloudScan feature.
+    private(set) var cloudDriveAccounts: [ScanTarget] = []
+    /// The fixed sidebar locations: volumes, local cloud folders, and remote
+    /// cloud-drive accounts. Unlike the Folders section these can never be
+    /// removed. Feeding cloud accounts through here joins them into sidebar
+    /// selection (`allTargets`), dedup, and the snapshot-cache keep-list.
+    var builtInLocations: [ScanTarget] { volumeLocations + cloudLocations + cloudDriveAccounts }
     /// What the snapshot cache holds per target path: which locations open
     /// instantly from cache, the sidebar's "Scanned … ago" subtitles, and
     /// how long the last scan took (whether a rescan should auto-start).
@@ -237,15 +243,23 @@ final class NeodiskViewModel {
     /// scans probe the cache optimistically instead of trusting the index.
     @ObservationIgnored private var hasIndexedSnapshotCache = false
     @ObservationIgnored private var preferencesCancellable: AnyCancellable?
+    /// The CloudScan integration, or nil in builds without the feature. Owns
+    /// the sidebar's connected accounts and the cloud scan stream.
+    @ObservationIgnored private(set) var cloudScan: (any CloudScanIntegrating)?
+    /// Last-known quota per cloud account, so the free-space cell renders
+    /// immediately on reselect while a fresh figure is fetched.
+    @ObservationIgnored private var cloudQuotaByTargetID: [String: (totalBytes: Int64?, usedBytes: Int64)] = [:]
 
     init(
         coordinator: ScanCoordinator = ScanCoordinator(),
         snapshotCache: ScanSnapshotCache = ScanSnapshotCache(),
-        sidebarFolderStore: SidebarFolderStore = SidebarFolderStore()
+        sidebarFolderStore: SidebarFolderStore = SidebarFolderStore(),
+        cloudScan: (any CloudScanIntegrating)? = nil
     ) {
         self.coordinator = coordinator
         self.snapshotCache = snapshotCache
         self.sidebarFolderStore = sidebarFolderStore
+        self.cloudScan = cloudScan
         self.search = SearchModel(coordinator: coordinator, indexService: searchIndexService)
         self.kinds = KindStatsModel(coordinator: coordinator, indexService: searchIndexService)
         self.largest = LargestFilesModel(coordinator: coordinator, indexService: searchIndexService)
@@ -273,6 +287,16 @@ final class NeodiskViewModel {
             if self.preferences?.autoScanDuplicates == true {
                 self.duplicates.startScan()
             }
+        }
+
+        // Seed the connected cloud accounts before the keep-list below is
+        // computed, so their persisted snapshots survive the launch prune
+        // (builtInLocations already folds cloudDriveAccounts in).
+        cloudDriveAccounts = cloudScan?.accountTargets ?? []
+        // Refresh the sidebar's cloud rows whenever an account is connected
+        // or signed out.
+        self.cloudScan?.onAccountsChanged = { [weak self] in
+            self?.refreshCloudDriveAccounts()
         }
 
         // Drop cache entries for locations no longer in the sidebar and
@@ -764,6 +788,10 @@ final class NeodiskViewModel {
     }
 
     private func updateFreeSpace() {
+        if coordinator.selectedTarget?.kind == .cloud {
+            updateCloudFreeSpace()
+            return
+        }
         guard let target = coordinator.selectedTarget,
               target.kind == .volume else {
             freeSpaceBytes = nil
@@ -784,6 +812,34 @@ final class NeodiskViewModel {
             availableCapacity: freeSpaceBytes,
             scannedBytes: scannedBytes
         )
+    }
+
+    /// Free space for a cloud account: quota capacity minus the account's
+    /// whole-quota usage. Renders through the same gates as volume free space
+    /// (sunburst always, treemap behind the Settings toggle). There is no
+    /// remote analog of purgeable/hidden space; the scan's own synthetic
+    /// "Unattributed" node covers trash and versions instead.
+    private func updateCloudFreeSpace() {
+        guard let target = coordinator.selectedTarget, target.kind == .cloud else { return }
+        hiddenSpaceBytes = nil
+        freeSpaceBytes = Self.cloudFreeSpaceBytes(quota: cloudQuotaByTargetID[target.id])
+        guard let cloudScan else { return }
+        Task { [weak self] in
+            guard let quota = await cloudScan.quota(forTargetID: target.id),
+                  let self,
+                  self.coordinator.selectedTarget?.id == target.id else { return }
+            self.cloudQuotaByTargetID[target.id] = quota
+            self.freeSpaceBytes = Self.cloudFreeSpaceBytes(quota: quota)
+        }
+    }
+
+    nonisolated static func cloudFreeSpaceBytes(
+        quota: (totalBytes: Int64?, usedBytes: Int64)?
+    ) -> Int64? {
+        // Unknown or unlimited quota → no free-space cell.
+        guard let quota, let total = quota.totalBytes else { return nil }
+        let free = total - quota.usedBytes
+        return free > 0 ? free : nil
     }
 
     /// DaisyDisk-style hidden space: total capacity minus available capacity
@@ -908,6 +964,47 @@ final class NeodiskViewModel {
             nodeCount: info.nodeCount,
             hasPreviousSnapshot: false
         )
+    }
+
+    // MARK: - Cloud accounts
+
+    /// Re-reads the connected cloud accounts after a connect or sign-out. The
+    /// assignment fires observation, so the sidebar's Cloud Drives section
+    /// updates.
+    private func refreshCloudDriveAccounts() {
+        cloudDriveAccounts = cloudScan?.accountTargets ?? []
+    }
+
+    /// Runs the provider's OAuth flow (opening the browser) and, on success,
+    /// scans the new account. Failures surface through the standard action
+    /// alert.
+    func connectCloudAccount(providerID: String) {
+        guard let cloudScan else { return }
+        Task { [weak self] in
+            do {
+                let target = try await cloudScan.connectAccount(providerID: providerID)
+                self?.startScan(target)
+            } catch {
+                self?.actionErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    /// Signs out of a connected cloud account: revokes and forgets its
+    /// credentials, drops its cached scan, and clears the display if that
+    /// account is what's on screen.
+    func signOutCloudAccount(targetID: String) {
+        guard let cloudScan else { return }
+        let wasDisplayed = coordinator.selectedTarget?.id == targetID
+        Task { [weak self, snapshotCache] in
+            await cloudScan.signOut(targetID: targetID)
+            await snapshotCache.removeSnapshot(forTargetID: targetID)
+            guard let self else { return }
+            self.cachedScanInfo.removeValue(forKey: targetID)
+            if wasDisplayed {
+                self.coordinator.clearScan()
+            }
+        }
     }
 
     // MARK: - Snapshot cache maintenance
@@ -1097,6 +1194,20 @@ final class NeodiskViewModel {
 
     // MARK: - File actions
 
+    /// False for a cloud snapshot: its nodes' paths are `cloudscan://`
+    /// identifiers, not filesystem paths, so Reveal in Finder / Open / Copy
+    /// Path / double-click reveal have nothing on disk to act on.
+    var snapshotSupportsFileActions: Bool {
+        coordinator.snapshot?.target.kind != .cloud
+    }
+
+    /// Whether the node's file actions (Reveal in Finder / Open / Copy Path)
+    /// apply: the node must offer them and the displayed snapshot must be a
+    /// filesystem scan.
+    func supportsFileActions(_ node: FileNodeRecord) -> Bool {
+        node.supportsFileActions && snapshotSupportsFileActions
+    }
+
     /// Spacebar Quick Look shared by the treemap and sunburst: previews the
     /// selected node, so click-then-space works without ever focusing one of
     /// the sidebar lists. Beeps when nothing is selected.
@@ -1111,7 +1222,7 @@ final class NeodiskViewModel {
     /// Return-key reveal shared by the treemap and sunburst. Beeps when the
     /// selection has no on-disk counterpart to show.
     func revealSelection() {
-        guard let node = selectedNode, node.supportsFileActions else {
+        guard let node = selectedNode, supportsFileActions(node) else {
             NSSound.beep()
             return
         }

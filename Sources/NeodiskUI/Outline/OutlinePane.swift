@@ -508,7 +508,7 @@ private struct OutlineTreeTable: NSViewRepresentable {
             guard let tableView,
                   case let row = tableView.clickedRow, row >= 0, row < rows.count else { return }
             let node = rows[row].node
-            guard node.supportsFileActions else { return }
+            guard model.supportsFileActions(node) else { return }
             model.select(node.id)
             model.reveal(node)
         }
@@ -518,7 +518,7 @@ private struct OutlineTreeTable: NSViewRepresentable {
             guard let tableView,
                   case let row = tableView.clickedRow, row >= 0, row < rows.count else { return }
             let node = rows[row].node
-            guard node.supportsFileActions else { return }
+            guard model.supportsFileActions(node) else { return }
             let model = self.model
             menu.addItem(ActionMenuItem(titleKey: "Reveal in Finder") { model.reveal(node) })
             menu.addItem(ActionMenuItem(titleKey: "Open") { model.open(node) })

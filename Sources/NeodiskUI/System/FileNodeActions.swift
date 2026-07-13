@@ -31,7 +31,7 @@ extension View {
     ) -> some View {
         contextMenu(forSelectionType: String.self) { ids in
             if let node = ids.first.flatMap({ model.store?.node(id: $0) }),
-               node.supportsFileActions {
+               model.supportsFileActions(node) {
                 Button("Reveal in Finder") { model.reveal(node) }
                 Button("Open") { model.open(node) }
                 Button("Copy Path") { model.copyPath(node) }
@@ -44,7 +44,7 @@ extension View {
         } primaryAction: { ids in
             guard let id = ids.first,
                   let node = model.store?.node(id: id),
-                  node.supportsFileActions else { return }
+                  model.supportsFileActions(node) else { return }
             model.select(id)
             model.reveal(node)
         }

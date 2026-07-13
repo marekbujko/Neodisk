@@ -170,7 +170,7 @@ final class TreemapController {
     func revealInFinder(at point: CGPoint) {
         guard let model, let cell = cell(at: point),
               let node = model.store?.node(id: cell.nodeID),
-              node.supportsFileActions else { return }
+              model.supportsFileActions(node) else { return }
         model.select(cell.nodeID)
         model.reveal(node)
     }
@@ -225,7 +225,7 @@ final class TreemapController {
     func contextMenu(at point: CGPoint) -> NSMenu? {
         guard let model, let cell = cell(at: point),
               let node = model.store?.node(id: cell.nodeID),
-              node.supportsFileActions else { return nil }
+              model.supportsFileActions(node) else { return nil }
 
         let menu = NSMenu()
         menu.autoenablesItems = false

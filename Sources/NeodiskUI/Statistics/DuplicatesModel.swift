@@ -78,9 +78,12 @@ final class DuplicatesModel {
     }
 
     /// Scanning hashes file contents against the displayed tree, so it needs
-    /// a complete snapshot and no scan already running.
+    /// a complete snapshot and no scan already running. Cloud snapshots have
+    /// no on-disk files to hash, so it never applies to them.
     var canScan: Bool {
-        coordinator.snapshot?.isComplete == true && !isScanning
+        coordinator.snapshot?.isComplete == true
+            && coordinator.snapshot?.target.kind != .cloud
+            && !isScanning
     }
 
     /// Nodes lit on the treemap: the open group's copies, or every
