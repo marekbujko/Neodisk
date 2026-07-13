@@ -31,7 +31,7 @@ struct FileSizeLabel: View {
         HStack(spacing: 3) {
             Text(NeodiskFormatters.size(node.displayWeight(includingCloudOnly: includeCloudOnly)))
             if includeCloudOnly {
-                Image(systemName: "cloud")
+                Image(systemName: "cloud.fill")
                     .font(.system(size: 9, weight: .medium))
                     .opacity(node.cloudOnlyLogicalSize > 0 ? 1 : 0)
                     .frame(width: Self.glyphSlotWidth)

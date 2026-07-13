@@ -253,7 +253,7 @@ private struct LegendRowView: View {
                 .monospacedDigit()
                 .foregroundStyle(isHeader ? .primary : .secondary)
             if reservesCloudGlyphSlot {
-                Image(systemName: "cloud")
+                Image(systemName: "cloud.fill")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(isHeader ? .primary : .secondary)
                     .opacity(row.showsCloudGlyph ? 1 : 0)

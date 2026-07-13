@@ -26,7 +26,7 @@ struct CloudSummaryStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
-                Image(systemName: "cloud")
+                Image(systemName: "cloud.fill")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                 Text("Cloud storage")
