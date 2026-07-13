@@ -21,10 +21,10 @@ enum CloudScanFactory {
     static func make(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> (any CloudScanIntegrating)? {
-        // Google Drive is always available (empty until its OAuth client is
-        // configured, in which case the connect button appears). The JSON
-        // fixture named by NEODISK_CLOUD_FIXTURE is appended for tests and
-        // screenshots — its account shows without OAuth.
+        // Every provider is always constructed (stored accounts keep working);
+        // its connect action appears only once its OAuth client is configured.
+        // The JSON fixture named by NEODISK_CLOUD_FIXTURE is appended for
+        // tests and screenshots — its account shows without OAuth.
         var providers: [any CloudProvider] = []
         var connectMenu: [(id: String, title: String)] = []
 
@@ -37,6 +37,28 @@ enum CloudScanFactory {
         providers.append(google)
         if googleConfig.isConfigured {
             connectMenu.append((id: google.providerID, title: "Connect Google Drive…"))
+        }
+
+        let dropboxConfig = DropboxOAuthConfiguration.fromEnvironment(environment)
+        let dropbox = DropboxProvider(
+            configuration: dropboxConfig,
+            transport: URLSessionTransport(),
+            tokenStore: KeychainTokenStore()
+        )
+        providers.append(dropbox)
+        if dropboxConfig.isConfigured {
+            connectMenu.append((id: dropbox.providerID, title: "Connect Dropbox…"))
+        }
+
+        let oneDriveConfig = OneDriveOAuthConfiguration.fromEnvironment(environment)
+        let oneDrive = OneDriveProvider(
+            configuration: oneDriveConfig,
+            transport: URLSessionTransport(),
+            tokenStore: KeychainTokenStore()
+        )
+        providers.append(oneDrive)
+        if oneDriveConfig.isConfigured {
+            connectMenu.append((id: oneDrive.providerID, title: "Connect OneDrive…"))
         }
 
         if let fixturePath = environment["NEODISK_CLOUD_FIXTURE"] {

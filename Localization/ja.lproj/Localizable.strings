@@ -311,3 +311,5 @@
 "Sign Out" = "サインアウト";
 "Neodisk will disconnect %@ and remove its cached scan. You can reconnect at any time." = "Neodiskは%@との接続を解除し、キャッシュされたスキャンを削除します。いつでも再接続できます。";
 "Connect a cloud account and keep it in the sidebar" = "クラウドアカウントを接続してサイドバーに表示";
+"Connect Dropbox…" = "Dropboxに接続…";
+"Connect OneDrive…" = "OneDriveに接続…";

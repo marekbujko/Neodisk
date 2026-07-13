@@ -311,3 +311,5 @@
 "Sign Out" = "Sign Out";
 "Neodisk will disconnect %@ and remove its cached scan. You can reconnect at any time." = "Neodisk will disconnect %@ and remove its cached scan. You can reconnect at any time.";
 "Connect a cloud account and keep it in the sidebar" = "Connect a cloud account and keep it in the sidebar";
+"Connect Dropbox…" = "Connect Dropbox…";
+"Connect OneDrive…" = "Connect OneDrive…";
