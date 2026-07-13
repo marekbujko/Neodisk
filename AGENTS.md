@@ -71,6 +71,17 @@ Swift/SwiftUI practices and keep the scanning core UI-free.
     Keychain at launch, and from a binary signed differently than the one
     that stored the token macOS shows an access prompt — which a headless
     run must never put on screen.
+  - Headless runs of the raw executable share the `Neodisk` UserDefaults
+    domain with the developer's own `swift run` sessions — captures inherit
+    whatever preferences (e.g. the cloud-only toggle) were last persisted
+    there. Check `defaults read Neodisk <key>` before concluding a feature
+    regressed.
+  - The sidebar's material background renders blank in offscreen
+    `NEODISK_UI_SNAPSHOT` captures — sidebar content can't be verified
+    headlessly; cover it with tests and a human look instead.
+  - `NEODISK_RENDER_CLOUD_ONLY=0` — `--render-png` weights cloud-only
+    (dataless) files like the app's toolbar toggle by default; set 0 for
+    the strict on-disk map.
 
 ## Project Structure
 
