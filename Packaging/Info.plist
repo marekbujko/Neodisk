@@ -51,7 +51,7 @@
 	     same feed is also attached to every GitHub release (fixed "latest"
 	     URL) so apps shipped before this cutover keep updating. -->
 	<key>SUFeedURL</key>
-	<string>https://neodisk.lucastakayasu.com/appcast.xml</string>
+	<string>https://neodisk.app/appcast.xml</string>
 	<!-- Background checks are on by default (Settings toggle opts out);
 	     installing always needs a user click (SUAutomaticallyUpdate stays
 	     unset/false). Shipping this key also suppresses Sparkle's own
