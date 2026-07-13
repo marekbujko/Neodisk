@@ -134,6 +134,20 @@ struct TreemapScene: Sendable {
         return desaturated * highlightDimBrightness
     }
 
+    /// Cloud-only cells: a gentler cousin of the highlight dim — nudged
+    /// toward gray and slightly darkened, so dataless content visibly
+    /// recedes next to on-disk files without going as mute as a dimmed
+    /// non-match. Applied to the resolved color, so every color mode
+    /// (kinds, age, highlights) inherits it; the raster hatch adds texture.
+    nonisolated static let datalessDesaturation: Float = 0.45
+    nonisolated static let datalessDimBrightness: Float = 0.85
+
+    nonisolated static func datalessRGB(_ rgb: SIMD3<Float>) -> SIMD3<Float> {
+        let gray = SIMD3<Float>(repeating: (rgb.x + rgb.y + rgb.z) / 3)
+        let desaturated = rgb + (gray - rgb) * datalessDesaturation
+        return desaturated * datalessDimBrightness
+    }
+
     nonisolated static func build(
         store: FileTreeStore,
         rootID: String,
@@ -239,6 +253,7 @@ struct TreemapScene: Sendable {
                         // mix stays plain, the cheap-and-correct v1.
                         let aggregateDataless = includingCloudOnly
                             && tail.allSatisfy { $0.allocatedSize == 0 }
+                        if aggregateDataless { aggregateRGB = datalessRGB(aggregateRGB) }
                         cells.append(TreemapCell(
                             nodeID: node.id,
                             rect: aggregateRect,
@@ -280,6 +295,7 @@ struct TreemapScene: Sendable {
             let isDataless = includingCloudOnly
                 && (node.isDataless
                     || (node.isDirectory && node.allocatedSize == 0 && node.cloudOnlyLogicalSize > 0))
+            if isDataless { rgb = datalessRGB(rgb) }
             cells.append(TreemapCell(
                 nodeID: node.id,
                 rect: rect,

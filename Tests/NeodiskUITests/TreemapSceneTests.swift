@@ -455,6 +455,24 @@ import NeodiskKit
         #expect(try !#require(on.cells.first { $0.nodeID == "/cloud/local.bin" }).isDataless)
     }
 
+    @Test func datalessCellColorIsGentlyMuted() throws {
+        let store = makeCloudStore()
+        let size = CGSize(width: 400, height: 300)
+
+        let on = TreemapScene.build(
+            store: store, rootID: "/cloud", size: size, catalog: .empty,
+            includingCloudOnly: true
+        )
+        let cloud = try #require(on.cells.first { $0.nodeID == "/cloud/remote.mov" })
+        let local = try #require(on.cells.first { $0.nodeID == "/cloud/local.bin" })
+        // Same kind, so both resolve the same base color; the dataless cell
+        // carries the muted variant — and the muted variant stays gentler
+        // than the kind-highlight dim of the same base.
+        #expect(cloud.rgb == TreemapScene.datalessRGB(local.rgb))
+        let asHighlightDim = TreemapScene.dimmedRGB(local.rgb)
+        #expect(cloud.rgb.sum() > asHighlightDim.sum())
+    }
+
     /// Files whose display weight ranks differently from their on-disk size:
     /// two cloud-only files (no bytes on disk, large logical size) interleaved
     /// with two on-disk files, named so weight order differs from name order.
