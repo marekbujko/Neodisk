@@ -34,17 +34,22 @@ struct FirmlinkPathTranslator: Sendable {
     /// An FSEvents relative path (relative to the device/volume root) mapped
     /// into the absolute path the scan tree uses. Firmlink prefixes are only
     /// honored on the Data volume; on any other volume the relative path is
-    /// simply appended to its mount point. The result is `/private`-stripped
-    /// to match Foundation's URL standardization (see below).
-    func absolutePath(forEventRelativePath relativePath: String, mountPoint: String) -> String {
+    /// simply appended to its mount point. The result lands in the same
+    /// `/private` namespace as `targetPath`'s scan tree (see below).
+    func absolutePath(
+        forEventRelativePath relativePath: String,
+        mountPoint: String,
+        targetPath: String
+    ) -> String {
         if mountPoint == Self.dataVolumeMountPoint {
             for entry in entries {
                 if relativePath == entry.dataRelative {
-                    return Self.standardizedPrivatePrefix(entry.firmlink)
+                    return Self.namespaced(entry.firmlink, forTarget: targetPath)
                 }
                 if relativePath.hasPrefix(entry.dataRelative + "/") {
-                    return Self.standardizedPrivatePrefix(
-                        entry.firmlink + relativePath.dropFirst(entry.dataRelative.count)
+                    return Self.namespaced(
+                        entry.firmlink + relativePath.dropFirst(entry.dataRelative.count),
+                        forTarget: targetPath
                     )
                 }
             }
@@ -53,9 +58,9 @@ struct FirmlinkPathTranslator: Sendable {
             return mountPoint
         }
         if mountPoint == "/" {
-            return Self.standardizedPrivatePrefix("/" + relativePath)
+            return Self.namespaced("/" + relativePath, forTarget: targetPath)
         }
-        return Self.standardizedPrivatePrefix(mountPoint + "/" + relativePath)
+        return Self.namespaced(mountPoint + "/" + relativePath, forTarget: targetPath)
     }
 
     /// A target's absolute path mapped to the path relative to the device's
@@ -88,8 +93,14 @@ struct FirmlinkPathTranslator: Sendable {
     /// Foundation's URL standardization drops the `/private` prefix from
     /// `/private/var|tmp|etc` paths (the root-level symlinks make both forms
     /// name the same directory), and `ScanTarget` normalization inherits
-    /// that — so the scan tree stores the stripped form and event paths must
-    /// surface the same way.
+    /// that — so a `/var|/tmp|/etc` target's tree stores the stripped form.
+    /// Every other target (notably a `/` volume scan) reaches `/private` by
+    /// plain traversal and stores the qualified form, so event paths must
+    /// surface in whichever namespace the target's own tree uses.
+    private static func namespaced(_ path: String, forTarget targetPath: String) -> String {
+        privateQualified(targetPath) == targetPath ? path : standardizedPrivatePrefix(path)
+    }
+
     private static let privateStandardizedRoots = ["/private/var", "/private/tmp", "/private/etc"]
 
     static func standardizedPrivatePrefix(_ path: String) -> String {

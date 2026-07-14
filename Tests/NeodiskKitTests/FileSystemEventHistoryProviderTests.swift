@@ -81,6 +81,31 @@ struct FileSystemEventHistoryProviderTests {
         #expect(events.allSatisfy { !$0.flags.contains(.historyDone) })
     }
 
+    @Test func rootVolumeHistorySurfacesPrivateQualifiedPaths() async throws {
+        // A "/" volume scan's tree stores /private/var|tmp|etc under their
+        // qualified paths (plain traversal), so root-target events must
+        // surface qualified too — the stripped form missed the baseline and
+        // degraded every Macintosh HD rescan to a full scan.
+        let target = ScanTarget(url: URL(filePath: "/", directoryHint: .isDirectory), kind: .volume)
+        let provider = DarwinFileSystemEventHistoryProvider()
+        guard let since = try? provider.currentCheckpoint(for: target) else { return }
+
+        let probe = URL(filePath: "/private/tmp/neodisk-probe-\(UUID().uuidString).txt")
+        try Data("x".utf8).write(to: probe)
+        defer { try? FileManager.default.removeItem(at: probe) }
+
+        let history = try await waitForHistory(
+            provider: provider,
+            since: since,
+            target: target,
+            deadline: Date().addingTimeInterval(10)
+        ) { $0.path == probe.path }
+
+        let events = try #require(history).events
+        #expect(events.contains { $0.path == probe.path })
+        #expect(events.allSatisfy { !$0.path.hasPrefix("/System/Volumes/Data/") })
+    }
+
     @Test func unchangedWindowReturnsEmptyWithoutStream() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

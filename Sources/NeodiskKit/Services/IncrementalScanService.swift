@@ -405,6 +405,10 @@ public final class IncrementalScanService: Sendable {
         switch error {
         case .volumeChanged, .eventIDRolledBack, .invalidCheckpointRange, .checkpointExpired, .osBuildChanged:
             return .checkpointInvalid
+        case .eventBudgetExceeded:
+            return .historyBudgetExceeded
+        case .historyReplayTimedOut:
+            return .historyReplayTimedOut
         default:
             return .historyUnavailable
         }

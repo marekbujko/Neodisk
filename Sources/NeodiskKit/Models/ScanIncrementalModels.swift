@@ -129,8 +129,8 @@ enum FileSystemEventHistoryError: Error, Equatable {
     case streamStartFailed
     /// HistoryDone never arrived within the replay deadline.
     case historyReplayTimedOut
-    /// More journaled events than the replay budget allows; a full scan is
-    /// cheaper than planning over them.
+    /// More distinct in-window changed paths than the replay budget retains;
+    /// a full scan is cheaper than planning over them.
     case eventBudgetExceeded
 }
 
@@ -167,6 +167,8 @@ enum IncrementalFullScanReason: String, Sendable, Equatable {
     case unattributedVolumeNode
     case checkpointInvalid
     case historyUnavailable
+    case historyBudgetExceeded
+    case historyReplayTimedOut
     case userDroppedEvents
     case kernelDroppedEvents
     case eventIDsWrapped

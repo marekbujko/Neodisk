@@ -198,6 +198,43 @@ struct IncrementalRescanPlannerTests {
         #expect(plan(events) == .rescanSubtrees(["/scan/docs"]))
     }
 
+    @Test func rootVolumePrivateVarEventsRescanTheirSubtree() {
+        // A "/" scan's tree stores /private/var/... — nodes come from plain
+        // traversal, not URL standardization — and the history provider now
+        // surfaces events in that same qualified namespace. Regression: the
+        // stripped form (/var/folders/...) missed the baseline, the ancestor
+        // walk climbed to the root, and every Macintosh HD rescan degraded
+        // to a full scan via .changedScanRoot.
+        let rootTarget = makeTestTarget("/", kind: .volume)
+        let folders = makeTestDirectoryNode(id: "/private/var/folders", name: "folders", children: [])
+        let varDir = makeTestDirectoryNode(id: "/private/var", name: "var", children: [folders])
+        let privateDir = makeTestDirectoryNode(id: "/private", name: "private", children: [varDir])
+        let users = makeTestDirectoryNode(id: "/Users", name: "Users", children: [])
+        let root = makeTestDirectoryNode(id: "/", name: "Root", children: [privateDir, users])
+        let baseline = FileTreeStore(root: root, childrenByID: [
+            "/": [privateDir, users],
+            "/private": [varDir],
+            "/private/var": [folders],
+        ])
+        var options = ScanOptions()
+        options.includeHiddenFiles = true
+        let result = IncrementalRescanPlanner.plan(
+            events: [event("/private/var/folders/zz/T/scratch.tmp", [.itemCreated])],
+            target: rootTarget,
+            baseline: baseline,
+            options: options,
+            behavior: ScanEngine.ScanBehavior(excludesStartupVolumeInternals: true),
+            exclusionMatcher: ScanExclusionMatcher(
+                patterns: [],
+                rootPath: "/",
+                includeCloudStorage: true,
+                cloudStorageRootPath: ScanOptions.defaultCloudStorageRootPath,
+                iCloudDriveRootPath: ScanOptions.defaultICloudDriveRootPath
+            )
+        )
+        #expect(result == .rescanSubtrees(["/private/var/folders"]))
+    }
+
     @Test func startupVolumeInternalsAreSkippedUnderRootBehavior() {
         let rootTarget = makeTestTarget("/", kind: .volume)
         let sub = makeTestDirectoryNode(id: "/Applications", name: "Applications", children: [])

@@ -17,34 +17,32 @@ import Testing
 
     @Test func dataRelativePathMapsToFirmlinkedAbsolute() {
         let translator = makeTranslator()
-        #expect(translator.absolutePath(forEventRelativePath: "Users/lucas", mountPoint: dataMount) == "/Users/lucas")
-        #expect(translator.absolutePath(forEventRelativePath: "Applications/Foo.app", mountPoint: dataMount) == "/Applications/Foo.app")
-        // /private/var collapses to the stripped form the tree stores.
-        #expect(translator.absolutePath(forEventRelativePath: "private/var/folders/x", mountPoint: dataMount) == "/var/folders/x")
+        #expect(translator.absolutePath(forEventRelativePath: "Users/lucas", mountPoint: dataMount, targetPath: "/") == "/Users/lucas")
+        #expect(translator.absolutePath(forEventRelativePath: "Applications/Foo.app", mountPoint: dataMount, targetPath: "/") == "/Applications/Foo.app")
     }
 
     @Test func firmlinkRootItselfMaps() {
         let translator = makeTranslator()
-        #expect(translator.absolutePath(forEventRelativePath: "Users", mountPoint: dataMount) == "/Users")
+        #expect(translator.absolutePath(forEventRelativePath: "Users", mountPoint: dataMount, targetPath: "/") == "/Users")
     }
 
     @Test func nonFirmlinkRelativeFallsBackToMountPoint() {
         let translator = makeTranslator()
-        #expect(translator.absolutePath(forEventRelativePath: "SomeData/file.bin", mountPoint: dataMount) == "\(dataMount)/SomeData/file.bin")
+        #expect(translator.absolutePath(forEventRelativePath: "SomeData/file.bin", mountPoint: dataMount, targetPath: "/") == "\(dataMount)/SomeData/file.bin")
     }
 
     @Test func firmlinkTableIgnoredOffTheDataVolume() {
         let translator = makeTranslator()
         // A plain external volume may coincidentally have a top-level "Users";
         // it must not be firmlink-rewritten into the root namespace.
-        #expect(translator.absolutePath(forEventRelativePath: "Users/x", mountPoint: "/Volumes/Ext") == "/Volumes/Ext/Users/x")
-        #expect(translator.absolutePath(forEventRelativePath: "Movies/a.mov", mountPoint: "/Volumes/Ext") == "/Volumes/Ext/Movies/a.mov")
+        #expect(translator.absolutePath(forEventRelativePath: "Users/x", mountPoint: "/Volumes/Ext", targetPath: "/Volumes/Ext") == "/Volumes/Ext/Users/x")
+        #expect(translator.absolutePath(forEventRelativePath: "Movies/a.mov", mountPoint: "/Volumes/Ext", targetPath: "/Volumes/Ext") == "/Volumes/Ext/Movies/a.mov")
     }
 
     @Test func emptyRelativeIsTheVolumeRoot() {
         let translator = makeTranslator()
-        #expect(translator.absolutePath(forEventRelativePath: "", mountPoint: "/Volumes/Ext") == "/Volumes/Ext")
-        #expect(translator.absolutePath(forEventRelativePath: "", mountPoint: dataMount) == dataMount)
+        #expect(translator.absolutePath(forEventRelativePath: "", mountPoint: "/Volumes/Ext", targetPath: "/Volumes/Ext") == "/Volumes/Ext")
+        #expect(translator.absolutePath(forEventRelativePath: "", mountPoint: dataMount, targetPath: "/") == dataMount)
     }
 
     // MARK: reverse (target absolute path -> volume-relative watch path)
@@ -75,7 +73,7 @@ import Testing
 
     // MARK: /private standardization (Foundation strips it for var/tmp/etc)
 
-    @Test func privateVarEventsSurfaceInTheStrippedFormTheTreeStores() {
+    @Test func privateVarEventsSurfaceInTheStrippedFormForStrippedTargets() {
         // ScanTarget("/var/folders/...") keeps the stripped form (Foundation
         // URL standardization), while the journal and the firmlink table
         // speak /private — both directions must bridge or a temp-dir target
@@ -86,13 +84,34 @@ import Testing
                 == "private/var/folders/x"
         )
         #expect(
-            translator.absolutePath(forEventRelativePath: "private/var/folders/x/f.bin", mountPoint: dataMount)
+            translator.absolutePath(forEventRelativePath: "private/var/folders/x/f.bin", mountPoint: dataMount, targetPath: "/var/folders/x")
                 == "/var/folders/x/f.bin"
         )
         // Non-special /private children keep their prefix.
         #expect(
-            translator.absolutePath(forEventRelativePath: "private/other", mountPoint: dataMount)
+            translator.absolutePath(forEventRelativePath: "private/other", mountPoint: dataMount, targetPath: "/var/folders/x")
                 == "/private/other"
+        )
+    }
+
+    @Test func privateVarEventsStayQualifiedForRootTargets() {
+        // A "/" volume scan reaches /private by plain traversal, so its tree
+        // stores /private/var/... — stripping there made every /var/folders
+        // event miss the baseline, walk up to the root, and force a full
+        // scan. Events must stay in the tree's qualified namespace.
+        let translator = makeTranslator()
+        #expect(
+            translator.absolutePath(forEventRelativePath: "private/var/folders/x/f.bin", mountPoint: dataMount, targetPath: "/")
+                == "/private/var/folders/x/f.bin"
+        )
+        #expect(
+            translator.absolutePath(forEventRelativePath: "private/tmp/t", mountPoint: dataMount, targetPath: "/")
+                == "/private/tmp/t"
+        )
+        // Same for a target that is itself inside the qualified namespace.
+        #expect(
+            translator.absolutePath(forEventRelativePath: "private/var/log/l", mountPoint: dataMount, targetPath: "/private")
+                == "/private/var/log/l"
         )
     }
 
@@ -116,7 +135,7 @@ import Testing
         #expect(translator.relativePath(forTarget: "/a/b/c", mountPoint: dataMount) == "nested/c")
         #expect(translator.relativePath(forTarget: "/a/x", mountPoint: dataMount) == "a/x")
         // forward: the same, mirrored.
-        #expect(translator.absolutePath(forEventRelativePath: "nested/c", mountPoint: dataMount) == "/a/b/c")
-        #expect(translator.absolutePath(forEventRelativePath: "a/x", mountPoint: dataMount) == "/a/x")
+        #expect(translator.absolutePath(forEventRelativePath: "nested/c", mountPoint: dataMount, targetPath: "/") == "/a/b/c")
+        #expect(translator.absolutePath(forEventRelativePath: "a/x", mountPoint: dataMount, targetPath: "/") == "/a/x")
     }
 }

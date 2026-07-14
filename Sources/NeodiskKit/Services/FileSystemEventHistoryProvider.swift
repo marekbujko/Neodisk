@@ -18,18 +18,21 @@ import Foundation
 struct DarwinFileSystemEventHistoryProvider: FileSystemEventHistoryProviding {
     private let latency: CFTimeInterval
     /// How long the replay may run before we give up and force a full scan.
-    /// The journal is finite, so HistoryDone normally arrives quickly; this
-    /// only fires when fseventsd stalls or the stream is torn down without a
-    /// terminating event (the latent hang Radix's collector could suffer).
+    /// This bounds the time a user waits on a failed incremental gamble, so
+    /// it must stay a small fraction of a full scan: replay drains at roughly
+    /// 50k delivered events/s, so 3s covers ~150k events — weeks of typical
+    /// churn even for a whole-volume window — while a stalled fseventsd (the
+    /// latent hang Radix's collector could suffer) costs 3s, not 15.
     private let replayTimeout: DispatchTimeInterval
-    /// Cap on raw events replayed before bailing to a full scan; planning over
-    /// more than this is more expensive than re-enumerating.
+    /// Cap on distinct in-window changed paths retained before bailing to a
+    /// full scan — a memory bound, since repeated events on the same path
+    /// coalesce. Wall-clock is `replayTimeout`'s job.
     private let eventBudget: Int
     private let firmlinkTranslator: FirmlinkPathTranslator
 
     init(
         latency: CFTimeInterval = 0.05,
-        replayTimeout: DispatchTimeInterval = .seconds(15),
+        replayTimeout: DispatchTimeInterval = .seconds(3),
         eventBudget: Int = 250_000,
         firmlinkTranslator: FirmlinkPathTranslator = .system
     ) {
@@ -92,6 +95,7 @@ struct DarwinFileSystemEventHistoryProvider: FileSystemEventHistoryProviding {
             since: since,
             through: through,
             mountPoint: volume.mountPoint,
+            targetPath: target.url.standardizedFileURL.path,
             firmlinkTranslator: firmlinkTranslator,
             eventBudget: eventBudget
         )
@@ -103,11 +107,15 @@ struct DarwinFileSystemEventHistoryProvider: FileSystemEventHistoryProviding {
             copyDescription: nil
         )
         let paths = [volume.relativeTargetPath] as CFArray
+        // Deliberately NOT kFSEventStreamCreateFlagFullHistory: fseventsd may
+        // then coalesce older journal chunks (fewer events, some flagged
+        // MustScanSubDirs), which is exactly what the planner wants — events
+        // are hints for WHERE to look, and coarser hints just widen the
+        // rescan. Full granular history only slows the drain.
         let createFlags = UInt32(
             kFSEventStreamCreateFlagFileEvents |
             kFSEventStreamCreateFlagWatchRoot |
-            kFSEventStreamCreateFlagNoDefer |
-            kFSEventStreamCreateFlagFullHistory
+            kFSEventStreamCreateFlagNoDefer
         )
         guard let stream = FSEventStreamCreateRelativeToDevice(
             nil,
@@ -259,15 +267,21 @@ private nonisolated let neodiskFSEventHistoryCallback: FSEventStreamCallback = {
 /// checked continuation. Resumes on exactly one of: HistoryDone (success),
 /// cancellation, the replay deadline, or the event budget being exceeded —
 /// `finish` is idempotent, so whichever fires first wins.
-private final class FSEventHistoryCollector: @unchecked Sendable {
+///
+/// Events coalesce per path (flags unioned, latest event ID kept): the
+/// planner is order-insensitive and re-enumeration is the source of truth,
+/// so a burst naming one path thousands of times carries no more information
+/// than a single merged event — and only distinct paths count against the
+/// budget, so churn concentrated in a few directories can't exhaust it.
+final class FSEventHistoryCollector: @unchecked Sendable {
     private let lock = NSLock()
     private let since: FSEventsCheckpoint
     private let through: FSEventsCheckpoint
     private let mountPoint: String
+    private let targetPath: String
     private let firmlinkTranslator: FirmlinkPathTranslator
     private let eventBudget: Int
-    private var events: [FileSystemChangeEvent] = []
-    private var rawEventCount = 0
+    private var eventsByPath: [String: FileSystemChangeEvent] = [:]
     private var continuation: CheckedContinuation<FileSystemEventHistory, Error>?
     private var completion: Result<FileSystemEventHistory, Error>?
 
@@ -275,12 +289,14 @@ private final class FSEventHistoryCollector: @unchecked Sendable {
         since: FSEventsCheckpoint,
         through: FSEventsCheckpoint,
         mountPoint: String,
+        targetPath: String,
         firmlinkTranslator: FirmlinkPathTranslator,
         eventBudget: Int
     ) {
         self.since = since
         self.through = through
         self.mountPoint = mountPoint
+        self.targetPath = targetPath
         self.firmlinkTranslator = firmlinkTranslator
         self.eventBudget = eventBudget
     }
@@ -333,7 +349,8 @@ private final class FSEventHistoryCollector: @unchecked Sendable {
             let relativePath = String(cString: relativePaths[index])
             let absolutePath = firmlinkTranslator.absolutePath(
                 forEventRelativePath: relativePath,
-                mountPoint: mountPoint
+                mountPoint: mountPoint,
+                targetPath: targetPath
             )
             received.append(FileSystemChangeEvent(
                 path: absolutePath,
@@ -347,14 +364,25 @@ private final class FSEventHistoryCollector: @unchecked Sendable {
             lock.unlock()
             return
         }
-        rawEventCount += eventCount
-        if rawEventCount > eventBudget {
+        for event in received {
+            if let existing = eventsByPath[event.path] {
+                eventsByPath[event.path] = FileSystemChangeEvent(
+                    path: event.path,
+                    eventID: max(existing.eventID, event.eventID),
+                    flags: existing.flags.union(event.flags)
+                )
+            } else {
+                eventsByPath[event.path] = event
+            }
+        }
+        if eventsByPath.count > eventBudget {
             lock.unlock()
             finish(.failure(FileSystemEventHistoryError.eventBudgetExceeded))
             return
         }
-        events.append(contentsOf: received)
-        let history = sawHistoryDone ? FileSystemEventHistory(events: events) : nil
+        let history = sawHistoryDone
+            ? FileSystemEventHistory(events: eventsByPath.values.sorted { $0.eventID < $1.eventID })
+            : nil
         lock.unlock()
 
         if let history {
