@@ -231,6 +231,7 @@ public struct ContentView: View {
             Label("Cloud-Only Files", systemImage: "cloud")
         }
         .toggleStyle(.button)
+        .tint(model.snapshotHasCloudItems ? .accentColor : .secondary)
         .disabled(!model.snapshotHasCloudItems)
         .help(
             !model.snapshotHasCloudItems
