@@ -2,31 +2,30 @@
 //  SunburstRingMetrics.swift
 //  SunburstCore
 //
-//  The single source of truth for sunburst ring radii. DaisyDisk renders
-//  deeper levels as progressively THINNER arcs so the outer detail rings take
-//  less radial space and the chart reads better; this computes that taper once
-//  and everything — the layout, the drill/zoom remap, and (transitively, via
-//  the segment radii it stamps) hit-testing — bands its rings through here, so
-//  the drawn arcs and the hovered arcs can never disagree.
+//  The single source of truth for sunburst ring radii. DaisyDisk renders the
+//  deepest levels as THINNER arcs so the outer detail takes less radial space
+//  and the chart reads better; this computes that taper once and everything —
+//  the layout, the drill/zoom remap, and (transitively, via the segment radii
+//  it stamps) hit-testing — bands its rings through here, so the drawn arcs
+//  and the hovered arcs can never disagree.
 //
-//  Pure stdlib: no Foundation, no `pow` (the taper decays by repeated
-//  multiplication), so it stays Embedded-Swift-compatible for the wasm build
-//  alongside the rest of SunburstCore.
+//  Pure stdlib: no Foundation, so it stays Embedded-Swift-compatible for the
+//  wasm build alongside the rest of SunburstCore.
 //
 
-/// Maps a ring depth to its radial band. Rings taper geometrically with depth:
-/// the inner rings keep full thickness, deeper rings shrink toward a floor so
-/// they stay clickable, and the whole stack is normalized to fill exactly the
-/// same outer radius regardless of how many rings there are.
+/// Maps a ring depth to its radial band. All rings share one full thickness
+/// except the outermost two, which step down (2/3, then 4/9 of a full ring),
+/// floored so deep arcs stay clickable, and the whole stack is normalized to
+/// fill exactly the same outer radius regardless of how many rings there are.
 public struct SunburstRingMetrics: Sendable, Equatable {
-    /// Each tapering ring is this fraction of the previous ring's thickness.
-    /// ~0.68 matches DaisyDisk's read: outer detail levels are visibly thinner
-    /// bands without vanishing.
-    public static let taperRatio: Double = 0.68
-    /// The innermost rings that keep full thickness before the taper begins
-    /// (depths 0 and 1). The inner structure is what the eye reads first, so
-    /// it stays at full width; the taper only thins the outer detail.
-    public static let fullThicknessRingCount = 2
+    /// Only the outermost rings thin; everything inside them keeps one full,
+    /// equal thickness (owner-tuned 2026-07-13: an all-depths geometric taper
+    /// read as goofy).
+    public static let taperedRingCount = 2
+    /// The next-to-last ring's fraction of a full ring, and the last ring's —
+    /// one step smaller, then one smaller again.
+    public static let penultimateRingRatio: Double = 2.0 / 3.0
+    public static let lastRingRatio: Double = 4.0 / 9.0
     /// A ring's band never gets thinner than this fraction of the chart
     /// radius, so deep arcs stay clickable. At a typical ~250pt chart radius
     /// that is ~9pt. When the floor binds (many rings), the radius it claims
@@ -107,13 +106,13 @@ public struct SunburstRingMetrics: Sendable, Equatable {
         return boundaries[ringIndex]
     }
 
-    /// Geometric taper thicknesses, floored and normalized to fill exactly
-    /// `available`. The inner `fullThicknessRingCount` rings weigh 1, each
-    /// deeper ring `taperRatio` times the one before; the weights are scaled
-    /// to the available span. Rings that would fall below the floor are
-    /// water-filled: pinned at the floor, with the remaining span redivided
-    /// among the rest by their weights, iterating until stable — so the floor
-    /// is honored without ever overrunning the total.
+    /// Ring thicknesses, floored and normalized to fill exactly `available`.
+    /// All rings weigh 1 except the outermost `taperedRingCount`, which get
+    /// the two taper ratios; the weights are scaled to the available span.
+    /// Rings that would fall below the floor are water-filled: pinned at the
+    /// floor, with the remaining span redivided among the rest by their
+    /// weights, iterating until stable — so the floor is honored without ever
+    /// overrunning the total.
     static func ringThicknesses(count: Int, available: Double) -> [Double] {
         guard count > 0, available > 0 else { return [] }
 
@@ -125,15 +124,12 @@ public struct SunburstRingMetrics: Sendable, Equatable {
             return Array(repeating: available / Double(count), count: count)
         }
 
-        var weights = [Double](repeating: 0, count: count)
-        var decay = 1.0
-        for depth in 0..<count {
-            if depth < Self.fullThicknessRingCount {
-                weights[depth] = 1
-            } else {
-                decay *= Self.taperRatio
-                weights[depth] = decay
-            }
+        var weights = [Double](repeating: 1, count: count)
+        // The taper wants full-thickness rings inside it to read against;
+        // with 2 or fewer rings there is no "inside", so stay uniform.
+        if count > Self.taperedRingCount {
+            weights[count - 2] = Self.penultimateRingRatio
+            weights[count - 1] = Self.lastRingRatio
         }
 
         var pinned = [Bool](repeating: false, count: count)

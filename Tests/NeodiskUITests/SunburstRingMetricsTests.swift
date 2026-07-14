@@ -38,25 +38,29 @@ import Testing
         }
     }
 
-    @Test func innerRingsKeepFullEqualThickness() {
+    @Test func onlyTheOutermostTwoRingsTaper() {
         let metrics = SunburstRingMetrics(depthLimit: 6)
-        // The first `fullThicknessRingCount` rings share one full thickness;
-        // the taper only starts beyond them.
-        #expect(abs(metrics.thickness(depth: 0) - metrics.thickness(depth: 1)) < 1e-12)
-        #expect(metrics.thickness(depth: 2) < metrics.thickness(depth: 1))
+        // Every ring inside the taper shares one full thickness…
+        let full = metrics.thickness(depth: 0)
+        for depth in 1...3 {
+            #expect(abs(metrics.thickness(depth: depth) - full) < 1e-12)
+        }
+        // …then the last two step down: one smaller, the next smaller again,
+        // at their published ratios.
+        #expect(abs(metrics.thickness(depth: 4) - full * SunburstRingMetrics.penultimateRingRatio) < 1e-12)
+        #expect(abs(metrics.thickness(depth: 5) - full * SunburstRingMetrics.lastRingRatio) < 1e-12)
     }
 
-    @Test func outerRingsAreVisiblyThinnerThanInner() {
-        let metrics = SunburstRingMetrics(depthLimit: 6)
-        // The whole point: the deepest ring reads as a much thinner band than
-        // the inner rings (roughly the compounded taper ratio).
-        #expect(metrics.thickness(depth: 5) < metrics.thickness(depth: 0) * 0.5)
+    @Test func twoOrFewerRingsStayUniform() {
+        // With nothing inside the taper to read against, the split is equal.
+        let metrics = SunburstRingMetrics(depthLimit: 2)
+        #expect(abs(metrics.thickness(depth: 0) - metrics.thickness(depth: 1)) < 1e-12)
     }
 
     @Test func floorKeepsDeepRingsClickable() {
-        // Enough rings that the geometric taper would starve the outer ones,
-        // but few enough that the floor still fits: every ring stays at least
-        // the floor thick, and the total never overruns.
+        // Enough rings that the tapered outer rings dip under the floor while
+        // the floor still fits: every ring stays at least the floor thick, and
+        // the total never overruns.
         let metrics = SunburstRingMetrics(depthLimit: 20)
         var total = 0.0
         for depth in 0..<20 {
