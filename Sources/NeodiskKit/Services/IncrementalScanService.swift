@@ -188,7 +188,7 @@ public final class IncrementalScanService: Sendable {
 
         case .noChanges:
             log("no changes for \(target.id) (\(history.events.count) events); checkpoint advanced")
-            var metrics = ScanMetrics()
+            var metrics = Self.metrics(from: baseline.aggregateStats)
             metrics.currentPath = target.url.path
             metrics.recalculateProgress(isComplete: true)
             continuation.yield(.progress(metrics))
@@ -233,9 +233,22 @@ public final class IncrementalScanService: Sendable {
 
         var replacements: [(id: String, store: FileTreeStore)] = []
         var newWarnings: [ScanWarning] = []
-        /// Visit counters of the subtrees already finished, so the strip's
-        /// totals grow monotonically instead of resetting per subtree.
-        var completedCounters = ScanMetrics()
+        /// Counters seeded with the baseline totals minus the subtrees being
+        /// rescanned, so the strip opens at what the previous scan already
+        /// knows ("1.2M files · 480 GB") and grows as sub-scans add their
+        /// portions back — starting from zero read as a scan of almost
+        /// nothing. Subtree totals then accumulate on top, keeping the strip
+        /// monotonic instead of resetting per subtree. Only files and bytes
+        /// are subtracted per subtree — the tree has no per-subtree directory
+        /// count, and the strip never renders directories mid-scan.
+        var completedCounters = Self.metrics(from: baseline.aggregateStats)
+        for rootID in rootIDs {
+            guard let node = baseline.treeStore.node(id: rootID) else { continue }
+            completedCounters.filesVisited = max(completedCounters.filesVisited - node.descendantFileCount, 0)
+            completedCounters.bytesDiscovered = max(completedCounters.bytesDiscovered - node.allocatedSize, 0)
+        }
+        completedCounters.currentPath = target.url.path
+        continuation.yield(.progress(completedCounters))
 
         for (index, rootID) in rootIDs.enumerated() {
             guard let node = baseline.treeStore.node(id: rootID) else {
@@ -335,7 +348,7 @@ public final class IncrementalScanService: Sendable {
         )
         log("rescanned \(rootIDs.count) subtree(s) for \(target.id)")
 
-        var metrics = completedCounters
+        var metrics = Self.metrics(from: spliced.aggregateStats)
         metrics.currentPath = target.url.path
         metrics.recalculateProgress(isComplete: true)
         continuation.yield(.progress(metrics))
@@ -415,6 +428,17 @@ public final class IncrementalScanService: Sendable {
     }
 
     // MARK: - Progress
+
+    /// Snapshot totals projected onto the strip's counters, so incremental
+    /// progress speaks in whole-scan numbers rather than only the rescanned
+    /// slice.
+    private nonisolated static func metrics(from stats: ScanAggregateStats) -> ScanMetrics {
+        var metrics = ScanMetrics()
+        metrics.filesVisited = stats.fileCount
+        metrics.directoriesVisited = stats.directoryCount
+        metrics.bytesDiscovered = stats.totalAllocatedSize
+        return metrics
+    }
 
     /// One sub-scan's cumulative metrics mapped into the whole rescan's
     /// 0–0.95 band, on top of the counters from subtrees already finished.

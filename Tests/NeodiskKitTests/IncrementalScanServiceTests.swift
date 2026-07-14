@@ -182,6 +182,48 @@ struct IncrementalScanServiceTests {
         expectEquivalentTrees(rescanned.treeStore, baseline.treeStore)
     }
 
+    @Test func rescanProgressStartsFromRetainedBaselineTotals() async throws {
+        let root = try makeTemporaryTree()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let target = ScanTarget(url: root)
+        let options = ScanOptions()
+        let provider = StubEventHistoryProvider(checkpoints: [checkpoint(10), checkpoint(20)])
+        let service = IncrementalScanService(engine: ScanEngine(), historyProvider: provider)
+
+        let baseline = try #require(try await finishedSnapshot(
+            from: service.scan(target: target, options: options)
+        ))
+        let beta = root.appending(path: "beta", directoryHint: .isDirectory)
+        try Data(repeating: 0x66, count: 6_144).write(to: beta.appending(path: "new.bin"))
+        provider.setHistory(.success(FileSystemEventHistory(events: [
+            FileSystemChangeEvent(path: target.id + "/beta/new.bin", eventID: 15, flags: [.itemCreated]),
+        ])))
+
+        var progress: [ScanMetrics] = []
+        var finished: ScanSnapshot?
+        for try await event in service.rescan(target: target, options: options, baselineProvider: { baseline }) {
+            switch event {
+            case .progress(let metrics): progress.append(metrics)
+            case .finished(let snapshot): finished = snapshot
+            default: break
+            }
+        }
+
+        // The strip opens at the baseline totals minus the subtree being
+        // rescanned, not at zero.
+        let betaNode = try #require(baseline.treeStore.node(id: target.id + "/beta"))
+        let first = try #require(progress.first)
+        #expect(first.filesVisited == baseline.aggregateStats.fileCount - betaNode.descendantFileCount)
+        #expect(first.bytesDiscovered == baseline.aggregateStats.totalAllocatedSize - betaNode.allocatedSize)
+
+        // And closes at exactly the spliced snapshot's totals.
+        let last = try #require(progress.last)
+        let snapshot = try #require(finished)
+        #expect(last.filesVisited == snapshot.aggregateStats.fileCount)
+        #expect(last.bytesDiscovered == snapshot.aggregateStats.totalAllocatedSize)
+        #expect(last.progressFraction == 1)
+    }
+
     @Test func providerValidationFailureFallsBackToFullScan() async throws {
         let root = try makeTemporaryTree()
         defer { try? FileManager.default.removeItem(at: root) }
