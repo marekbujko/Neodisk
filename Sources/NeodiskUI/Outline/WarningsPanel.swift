@@ -72,7 +72,7 @@ struct WarningsPanel: View {
     let model: NeodiskViewModel
 
     var body: some View {
-        let warnings = model.visibleScanWarnings
+        let warnings = model.warnings.visible
         if !warnings.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
@@ -81,7 +81,7 @@ struct WarningsPanel: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button {
-                        model.dismissAllWarnings()
+                        model.warnings.dismissAll()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
@@ -98,7 +98,7 @@ struct WarningsPanel: View {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(warnings) { warning in
                             WarningRow(warning: warning) {
-                                model.dismissWarning(warning.id)
+                                model.warnings.dismiss(warning.id)
                             }
                             Divider().padding(.leading, 12)
                         }

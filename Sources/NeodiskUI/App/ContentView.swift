@@ -101,12 +101,12 @@ public struct ContentView: View {
         // strip). Recheck on activation: that is when the user comes back
         // from granting access in System Settings.
         .task {
-            await model.refreshFullDiskAccessStatus()
+            await model.warnings.refreshFullDiskAccessStatus()
         }
         .onReceive(
             NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
         ) { _ in
-            Task { await model.refreshFullDiskAccessStatus() }
+            Task { await model.warnings.refreshFullDiskAccessStatus() }
         }
         .toolbar { toolbarContent }
         .navigationTitle(windowTitle)
@@ -442,7 +442,7 @@ private struct WorkspaceView: View {
         // With Full Disk Access granted the remaining unreadable locations
         // are protected for reasons no grant can fix, so the notice strip
         // (like the warnings panel) stays hidden.
-        guard model.fullDiskAccessStatus != .granted,
+        guard model.warnings.fullDiskAccessStatus != .granted,
               let snapshot = model.coordinator.snapshot, snapshot.isComplete else { return 0 }
         return snapshot.scanWarnings.count { $0.category == .permissionDenied }
     }
@@ -491,7 +491,7 @@ private struct WorkspaceView: View {
                     SnapshotNoticePanel(model: model)
                     WarningsPanel(model: model)
                 }
-                .animation(.easeInOut(duration: 0.2), value: model.visibleScanWarnings.isEmpty)
+                .animation(.easeInOut(duration: 0.2), value: model.warnings.visible.isEmpty)
                 .animation(.easeInOut(duration: 0.2), value: model.snapshotNotice)
             }
 

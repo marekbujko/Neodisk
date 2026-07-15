@@ -37,9 +37,9 @@ import NeodiskKit
         model.coordinator.restoreCompletedSnapshot(
             makeTestSnapshot(target: makeTestTarget("/root"), root: root, store: store, warnings: warnings)
         )
-        model.dismissWarning(dismissed.id)
+        model.warnings.dismiss(dismissed.id)
 
-        let visible = model.visibleScanWarnings
+        let visible = model.warnings.visible
         #expect(visible.count == 100)
         #expect(Set(visible.map(\.id)).count == 100)
         #expect(!visible.contains { $0.id == dismissed.id })
@@ -69,15 +69,15 @@ import NeodiskKit
         )
 
         // Without a Full Disk Access verdict, every warning shows.
-        #expect(model.fullDiskAccessStatus == .unknown)
-        #expect(model.visibleScanWarnings.map(\.id) == [denied.id, ioError.id])
+        #expect(model.warnings.fullDiskAccessStatus == .unknown)
+        #expect(model.warnings.visible.map(\.id) == [denied.id, ioError.id])
 
         // Granted: the remaining permission-denied warnings are dead ends no
         // grant can fix, so they hide; genuine filesystem errors stay.
-        model.fullDiskAccessStatus = .granted
-        #expect(model.visibleScanWarnings.map(\.id) == [ioError.id])
+        model.warnings.fullDiskAccessStatus = .granted
+        #expect(model.warnings.visible.map(\.id) == [ioError.id])
 
-        model.fullDiskAccessStatus = .notGranted
-        #expect(model.visibleScanWarnings.map(\.id) == [denied.id, ioError.id])
+        model.warnings.fullDiskAccessStatus = .notGranted
+        #expect(model.warnings.visible.map(\.id) == [denied.id, ioError.id])
     }
 }

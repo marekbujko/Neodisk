@@ -191,7 +191,7 @@ import NeodiskKit
         model.hoveredNodeID = file.id
         model.zoomRootID = targetA.id
         model.expandedAggregateIDs = [targetA.id]
-        model.dismissWarning(warning.id)
+        model.warnings.dismiss(warning.id)
         model.stopScan()
         #expect(model.scanWasStopped)
 
@@ -203,7 +203,7 @@ import NeodiskKit
         #expect(model.zoomRootID == nil)
         #expect(model.expandedNodeIDs.isEmpty)
         #expect(model.expandedAggregateIDs.isEmpty)
-        #expect(model.dismissedWarningIDs.isEmpty)
+        #expect(model.warnings.dismissedWarningIDs.isEmpty)
         #expect(!model.scanWasStopped)
         model.stopScan()
     }
@@ -230,13 +230,13 @@ import NeodiskKit
         try await waitUntilAsync("scan persisted") {
             await environment.cache.loadSnapshot(for: target) != nil
         }
-        #expect(model.visibleScanWarnings.count == 2)
+        #expect(model.warnings.visible.count == 2)
 
         // Dismissing one shrinks the panel; dismissing all empties it.
-        model.dismissWarning(warningA.id)
-        #expect(model.visibleScanWarnings.map(\.id) == [warningB.id])
-        model.dismissAllWarnings()
-        #expect(model.visibleScanWarnings.isEmpty)
+        model.warnings.dismiss(warningA.id)
+        #expect(model.warnings.visible.map(\.id) == [warningB.id])
+        model.warnings.dismissAll()
+        #expect(model.warnings.visible.isEmpty)
 
         // A rescan resets the dismissals, so the same still-current warnings
         // come back once the refreshed snapshot lands.
@@ -244,9 +244,9 @@ import NeodiskKit
         environment.scanService.yield(.finished(warned()), scanIndex: 1)
         environment.scanService.finish(scanIndex: 1)
         try await waitUntilAsync("warnings resurfaced after rescan") {
-            model.visibleScanWarnings.count == 2
+            model.warnings.visible.count == 2
         }
-        #expect(Set(model.visibleScanWarnings.map(\.id)) == [warningA.id, warningB.id])
+        #expect(Set(model.warnings.visible.map(\.id)) == [warningA.id, warningB.id])
         model.stopScan()
     }
 

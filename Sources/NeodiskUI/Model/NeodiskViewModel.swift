@@ -108,51 +108,12 @@ final class NeodiskViewModel {
     var scanWasStopped = false
     /// Shows the first-launch welcome sheet (also reachable from Settings).
     var showWelcomeSheet = false
-    /// Warnings the user closed in the floating panel. Reset when a new
-    /// scan starts, so a rescan resurfaces still-current warnings.
-    var dismissedWarningIDs: Set<ScanWarning.ID> = []
 
-    /// Latest Full Disk Access probe result. With access granted, the
-    /// permission-denied warnings that remain are dead ends the user cannot
-    /// fix (other users' home folders, SIP-protected system paths), so the
-    /// warning surfaces hide them. Refreshed on launch and app activation.
-    var fullDiskAccessStatus: FullDiskAccessStatus = .unknown
+    // MARK: Scan warnings
 
-    func refreshFullDiskAccessStatus() async {
-        fullDiskAccessStatus = await Task.detached(priority: .utility) {
-            SystemIntegration.fullDiskAccessStatus()
-        }.value
-    }
-
-    /// Scan warnings still visible in the floating panel (capped to keep the
-    /// panel responsive on scans with thousands of skipped items).
-    var visibleScanWarnings: [ScanWarning] {
-        guard let snapshot = coordinator.snapshot, snapshot.isComplete else { return [] }
-        let hidePermissionDenied = fullDiskAccessStatus == .granted
-        // Eager loop: a lazy filter whose predicate mutates state (the seen-ID
-        // dedupe) violates Collection semantics and traps inside prefix(_:).
-        var seenIDs = Set<ScanWarning.ID>()
-        var visible: [ScanWarning] = []
-        for warning in snapshot.scanWarnings {
-            if hidePermissionDenied && warning.category == .permissionDenied { continue }
-            // Warning identity is content-derived, so repeat warnings for the
-            // same path collapse to one row.
-            guard !dismissedWarningIDs.contains(warning.id),
-                  seenIDs.insert(warning.id).inserted else { continue }
-            visible.append(warning)
-            if visible.count == 100 { break }
-        }
-        return visible
-    }
-
-    func dismissWarning(_ id: ScanWarning.ID) {
-        dismissedWarningIDs.insert(id)
-    }
-
-    func dismissAllWarnings() {
-        guard let snapshot = coordinator.snapshot else { return }
-        dismissedWarningIDs.formUnion(snapshot.scanWarnings.map(\.id))
-    }
+    /// Floating-panel warning visibility, dismissals, and the Full Disk
+    /// Access probe; see ScanWarningsModel.
+    let warnings: ScanWarningsModel
     /// The sidebar's Folders section: seeded with the common folders on
     /// first launch, extended by Add Folder, every entry removable.
     var sidebarFolders: [ScanTarget] = []
@@ -275,6 +236,7 @@ final class NeodiskViewModel {
         self.snapshotCache = snapshotCache
         self.sidebarFolderStore = sidebarFolderStore
         self.cloudScan = cloudScan
+        self.warnings = ScanWarningsModel(coordinator: coordinator)
         self.search = SearchModel(coordinator: coordinator, indexService: searchIndexService)
         self.kinds = KindStatsModel(coordinator: coordinator, indexService: searchIndexService)
         self.largest = LargestFilesModel(coordinator: coordinator, indexService: searchIndexService)
@@ -508,7 +470,7 @@ final class NeodiskViewModel {
         ages.reset()
         changes.reset()
         scanWasStopped = false
-        dismissedWarningIDs = []
+        warnings.reset()
     }
 
     /// Shows the persisted snapshot of a location without rescanning it.
