@@ -460,11 +460,6 @@ import NeodiskKit
 
 }
 
-private struct ControlledScanRequest {
-    let target: ScanTarget
-    let options: ScanOptions
-}
-
 private actor RecordingSnapshotTransformService: ScanSnapshotTransforming {
     private var removingNodeIDs: [String] = []
 
@@ -514,76 +509,8 @@ private actor RecordingSnapshotTransformService: ScanSnapshotTransforming {
     }
 }
 
-private final class ControlledScanService: ScanEventStreaming, @unchecked Sendable {
-    private typealias Continuation = AsyncThrowingStream<ScanProgressEvent, Error>.Continuation
-
-    private let lock = NSLock()
-    private var continuations: [Continuation] = []
-    private var storedRequests: [ControlledScanRequest] = []
-    private var storedTerminationCount = 0
-
-    var requests: [ControlledScanRequest] {
-        lock.lock()
-        defer { lock.unlock() }
-        return storedRequests
-    }
-
-    var terminationCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return storedTerminationCount
-    }
-
-    func scan(target: ScanTarget, options: ScanOptions) -> AsyncThrowingStream<ScanProgressEvent, Error> {
-        AsyncThrowingStream { continuation in
-            lock.lock()
-            continuations.append(continuation)
-            storedRequests.append(ControlledScanRequest(target: target, options: options))
-            lock.unlock()
-
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                self.lock.lock()
-                self.storedTerminationCount += 1
-                self.lock.unlock()
-            }
-        }
-    }
-
-    func yield(_ event: ScanProgressEvent, scanIndex: Int) {
-        continuation(at: scanIndex)?.yield(event)
-    }
-
-    func finish(scanIndex: Int, throwing error: Error? = nil) {
-        continuation(at: scanIndex)?.finish(throwing: error)
-    }
-
-    private func continuation(at index: Int) -> Continuation? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard continuations.indices.contains(index) else { return nil }
-        return continuations[index]
-    }
-}
-
 
 @MainActor
-private func waitUntil(
-    _ description: String,
-    timeout: TimeInterval = 1,
-    condition: () -> Bool
-) async throws {
-    let deadline = Date().addingTimeInterval(timeout)
-    while !condition() {
-        if Date() >= deadline {
-            Issue.record("Timed out waiting for \(description).")
-            return
-        }
-
-        try await Task.sleep(for: .milliseconds(10))
-    }
-}
-
 private func makeCoordinatorTarget(_ path: String) -> ScanTarget {
     ScanTarget(url: URL(filePath: path, directoryHint: .isDirectory))
 }

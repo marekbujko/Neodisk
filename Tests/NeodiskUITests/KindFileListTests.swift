@@ -114,19 +114,3 @@ import NeodiskKit
         }
     }
 }
-
-@MainActor
-private func waitUntil(
-    _ description: String,
-    timeout: TimeInterval = 2,
-    condition: () -> Bool
-) async throws {
-    let deadline = Date().addingTimeInterval(timeout)
-    while !condition() {
-        if Date() >= deadline {
-            Issue.record("Timed out waiting for \(description).")
-            return
-        }
-        try await Task.sleep(for: .milliseconds(10))
-    }
-}

@@ -1,5 +1,7 @@
 import Foundation
+import Testing
 import NeodiskKit
+@testable import NeodiskUI
 
 /// Tears down a per-test UserDefaults suite without leaving a plist behind.
 /// removePersistentDomain alone is not enough: cfprefsd answers it by
@@ -87,4 +89,101 @@ func makeTestSnapshot(
         aggregateStats: store.aggregateStats,
         isComplete: true
     )
+}
+
+// MARK: - Controlled scan stream
+
+struct ControlledScanRequest {
+    let target: ScanTarget
+    let options: ScanOptions
+}
+
+/// Hand-driven ScanEventStreaming fake shared by the coordinator and view
+/// model suites: tests yield events per scan index instead of scanning disk,
+/// and can assert the requests made and stream terminations observed.
+final class ControlledScanService: ScanEventStreaming, @unchecked Sendable {
+    private typealias Continuation = AsyncThrowingStream<ScanProgressEvent, Error>.Continuation
+
+    private let lock = NSLock()
+    private var continuations: [Continuation] = []
+    private var storedRequests: [ControlledScanRequest] = []
+    private var storedTerminationCount = 0
+
+    var requests: [ControlledScanRequest] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedRequests
+    }
+
+    var scanCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return continuations.count
+    }
+
+    var terminationCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedTerminationCount
+    }
+
+    func scan(target: ScanTarget, options: ScanOptions) -> AsyncThrowingStream<ScanProgressEvent, Error> {
+        AsyncThrowingStream { continuation in
+            lock.lock()
+            continuations.append(continuation)
+            storedRequests.append(ControlledScanRequest(target: target, options: options))
+            lock.unlock()
+
+            continuation.onTermination = { [weak self] _ in
+                guard let self else { return }
+                self.lock.lock()
+                self.storedTerminationCount += 1
+                self.lock.unlock()
+            }
+        }
+    }
+
+    func yield(_ event: ScanProgressEvent, scanIndex: Int) {
+        continuation(at: scanIndex)?.yield(event)
+    }
+
+    func finish(scanIndex: Int, throwing error: Error? = nil) {
+        continuation(at: scanIndex)?.finish(throwing: error)
+    }
+
+    private func continuation(at index: Int) -> Continuation? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard continuations.indices.contains(index) else { return nil }
+        return continuations[index]
+    }
+}
+
+// MARK: - Eventual-state assertions
+
+/// Polls until the condition holds, recording a test failure on timeout.
+/// The async-condition form; the sync overload below forwards here.
+@MainActor
+func waitUntilAsync(
+    _ description: String,
+    timeout: TimeInterval = 2,
+    condition: () async -> Bool
+) async throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    while !(await condition()) {
+        if Date() >= deadline {
+            Issue.record("Timed out waiting for \(description).")
+            return
+        }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+}
+
+@MainActor
+func waitUntil(
+    _ description: String,
+    timeout: TimeInterval = 2,
+    condition: () -> Bool
+) async throws {
+    try await waitUntilAsync(description, timeout: timeout, condition: condition)
 }

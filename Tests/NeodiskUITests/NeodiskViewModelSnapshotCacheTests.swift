@@ -460,7 +460,7 @@ import NeodiskKit
     private struct TestEnvironment {
         let cacheDirectory: URL
         let cache: ScanSnapshotCache
-        let scanService: ControlledCacheScanService
+        let scanService: ControlledScanService
         let sidebarFolderStore: SidebarFolderStore
         let defaults: UserDefaults
         private let defaultsSuiteName: String
@@ -469,7 +469,7 @@ import NeodiskKit
             cacheDirectory = FileManager.default.temporaryDirectory
                 .appending(path: "NeodiskVMCacheTests-\(UUID().uuidString)", directoryHint: .isDirectory)
             cache = ScanSnapshotCache(directoryURL: cacheDirectory, isLoggingEnabled: false)
-            scanService = ControlledCacheScanService()
+            scanService = ControlledScanService()
             defaultsSuiteName = "NeodiskVMCacheTests-\(UUID().uuidString)"
             defaults = try #require(UserDefaults(suiteName: defaultsSuiteName))
             sidebarFolderStore = SidebarFolderStore(defaults: defaults)
@@ -524,59 +524,5 @@ import NeodiskKit
             startedAt: startedAt,
             finishedAt: finishedAt
         )
-    }
-}
-
-/// Same shape as ScanCoordinatorTests' controlled service, local to this
-/// suite because that one is file-private.
-private final class ControlledCacheScanService: ScanEventStreaming, @unchecked Sendable {
-    private typealias Continuation = AsyncThrowingStream<ScanProgressEvent, Error>.Continuation
-
-    private let lock = NSLock()
-    private var continuations: [Continuation] = []
-
-    func scan(target: ScanTarget, options: ScanOptions) -> AsyncThrowingStream<ScanProgressEvent, Error> {
-        AsyncThrowingStream { continuation in
-            lock.lock()
-            continuations.append(continuation)
-            lock.unlock()
-        }
-    }
-
-    var scanCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return continuations.count
-    }
-
-    func yield(_ event: ScanProgressEvent, scanIndex: Int) {
-        continuation(at: scanIndex)?.yield(event)
-    }
-
-    func finish(scanIndex: Int, throwing error: Error? = nil) {
-        continuation(at: scanIndex)?.finish(throwing: error)
-    }
-
-    private func continuation(at index: Int) -> Continuation? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard continuations.indices.contains(index) else { return nil }
-        return continuations[index]
-    }
-}
-
-@MainActor
-private func waitUntilAsync(
-    _ description: String,
-    timeout: TimeInterval = 2,
-    condition: () async -> Bool
-) async throws {
-    let deadline = Date().addingTimeInterval(timeout)
-    while !(await condition()) {
-        if Date() >= deadline {
-            Issue.record("Timed out waiting for \(description).")
-            return
-        }
-        try await Task.sleep(for: .milliseconds(10))
     }
 }

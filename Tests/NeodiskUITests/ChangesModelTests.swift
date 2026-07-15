@@ -180,19 +180,3 @@ import NeodiskKit
         return makeTestSnapshot(target: target, root: root, store: store)
     }
 }
-
-@MainActor
-private func waitUntilAsync(
-    _ description: String,
-    timeout: TimeInterval = 2,
-    condition: () async -> Bool
-) async throws {
-    let deadline = Date().addingTimeInterval(timeout)
-    while !(await condition()) {
-        if Date() >= deadline {
-            Issue.record("Timed out waiting for \(description).")
-            return
-        }
-        try await Task.sleep(for: .milliseconds(10))
-    }
-}
