@@ -319,8 +319,8 @@ import NeodiskKit
         }
 
         // updateFreeSpace only fills these for volume/cloud targets.
-        #expect(model.freeSpaceBytes == nil)
-        #expect(model.hiddenSpaceBytes == nil)
+        #expect(model.freeSpace.freeSpaceBytes == nil)
+        #expect(model.freeSpace.hiddenSpaceBytes == nil)
     }
 
     // MARK: - Fixtures

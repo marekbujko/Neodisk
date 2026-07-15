@@ -91,10 +91,10 @@ extension VizHoverTooltipData {
         let basisName = basis?.name ?? ""
 
         if model.hoveredCellIsFreeSpace {
-            return VizHoverTooltipData(kind: .freeSpace, sizeBytes: model.freeSpaceBytes ?? 0, basisBytes: basisBytes, basisName: basisName)
+            return VizHoverTooltipData(kind: .freeSpace, sizeBytes: model.freeSpace.freeSpaceBytes ?? 0, basisBytes: basisBytes, basisName: basisName)
         }
         if model.hoveredCellIsHiddenSpace {
-            return VizHoverTooltipData(kind: .hiddenSpace, sizeBytes: model.hiddenSpaceBytes ?? 0, basisBytes: basisBytes, basisName: basisName)
+            return VizHoverTooltipData(kind: .hiddenSpace, sizeBytes: model.freeSpace.hiddenSpaceBytes ?? 0, basisBytes: basisBytes, basisName: basisName)
         }
         if let aggregate = model.hoveredAggregate {
             return VizHoverTooltipData(kind: .aggregate(itemCount: aggregate.itemCount), sizeBytes: aggregate.totalSize, basisBytes: basisBytes, basisName: basisName)

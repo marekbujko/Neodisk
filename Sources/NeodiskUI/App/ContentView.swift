@@ -653,7 +653,7 @@ private struct StatusBar: View {
                     .frame(width: 10, height: 10)
                 Text("Free space on this volume")
                 Spacer(minLength: 12)
-                if let freeSpaceBytes = model.freeSpaceBytes {
+                if let freeSpaceBytes = model.freeSpace.freeSpaceBytes {
                     Text(NeodiskFormatters.size(freeSpaceBytes))
                         .monospacedDigit()
                 }
@@ -668,7 +668,7 @@ private struct StatusBar: View {
                 Text("Hidden space on this volume")
                     .help("Purgeable space, local snapshots, and files the scan could not see.")
                 Spacer(minLength: 12)
-                if let hiddenSpaceBytes = model.hiddenSpaceBytes {
+                if let hiddenSpaceBytes = model.freeSpace.hiddenSpaceBytes {
                     Text(NeodiskFormatters.size(hiddenSpaceBytes))
                         .monospacedDigit()
                 }

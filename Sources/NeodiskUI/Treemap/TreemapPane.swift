@@ -81,8 +81,8 @@ private struct TreemapRepresentable: NSViewRepresentable {
             // them once the user zooms into a subfolder. The treemap gates
             // them behind the Settings toggle (the sunburst always shows
             // them) — hence the treemap-specific accessors.
-            freeSpaceBytes: model.zoomRootID == nil ? model.treemapFreeSpaceBytes : nil,
-            hiddenSpaceBytes: model.zoomRootID == nil ? model.treemapHiddenSpaceBytes : nil,
+            freeSpaceBytes: model.zoomRootID == nil ? model.freeSpace.treemapFreeSpaceBytes : nil,
+            hiddenSpaceBytes: model.zoomRootID == nil ? model.freeSpace.treemapHiddenSpaceBytes : nil,
             includingCloudOnly: model.showsCloudOnlyFiles,
             palette: model.vizPalette
         )

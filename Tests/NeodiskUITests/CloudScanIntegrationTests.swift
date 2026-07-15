@@ -237,11 +237,11 @@ private struct IsolatedModelEnvironment {
 
 @Suite struct CloudFreeSpaceTests {
     @Test func testCloudFreeSpaceFromQuota() {
-        #expect(NeodiskViewModel.cloudFreeSpaceBytes(quota: (totalBytes: 1000, usedBytes: 300)) == 700)
+        #expect(FreeSpaceModel.cloudFreeSpaceBytes(quota: (totalBytes: 1000, usedBytes: 300)) == 700)
         // Unlimited plan or unknown quota → no free-space cell.
-        #expect(NeodiskViewModel.cloudFreeSpaceBytes(quota: (totalBytes: nil, usedBytes: 300)) == nil)
-        #expect(NeodiskViewModel.cloudFreeSpaceBytes(quota: nil) == nil)
+        #expect(FreeSpaceModel.cloudFreeSpaceBytes(quota: (totalBytes: nil, usedBytes: 300)) == nil)
+        #expect(FreeSpaceModel.cloudFreeSpaceBytes(quota: nil) == nil)
         // Over-quota accounts must not render negative free space.
-        #expect(NeodiskViewModel.cloudFreeSpaceBytes(quota: (totalBytes: 100, usedBytes: 300)) == nil)
+        #expect(FreeSpaceModel.cloudFreeSpaceBytes(quota: (totalBytes: 100, usedBytes: 300)) == nil)
     }
 }

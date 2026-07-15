@@ -14,33 +14,33 @@ import Testing
 
 @Suite struct HiddenSpaceComputationTests {
     @Test func hiddenSpaceIsCapacityMinusAvailableMinusScanned() {
-        #expect(NeodiskViewModel.hiddenSpaceBytes(
+        #expect(FreeSpaceModel.hiddenSpaceBytes(
             totalCapacity: 1_000, availableCapacity: 300, scannedBytes: 500
         ) == 200)
     }
 
     @Test func missingInputsYieldNoHiddenSpace() {
-        #expect(NeodiskViewModel.hiddenSpaceBytes(
+        #expect(FreeSpaceModel.hiddenSpaceBytes(
             totalCapacity: nil, availableCapacity: 300, scannedBytes: 500
         ) == nil)
-        #expect(NeodiskViewModel.hiddenSpaceBytes(
+        #expect(FreeSpaceModel.hiddenSpaceBytes(
             totalCapacity: 1_000, availableCapacity: nil, scannedBytes: 500
         ) == nil)
         // No scanned total (scan incomplete or absent): the unaccounted
         // remainder is unknown, not hidden.
-        #expect(NeodiskViewModel.hiddenSpaceBytes(
+        #expect(FreeSpaceModel.hiddenSpaceBytes(
             totalCapacity: 1_000, availableCapacity: 300, scannedBytes: nil
         ) == nil)
     }
 
     @Test func nonPositiveRemaindersClampToNothing() {
         // Exactly accounted for.
-        #expect(NeodiskViewModel.hiddenSpaceBytes(
+        #expect(FreeSpaceModel.hiddenSpaceBytes(
             totalCapacity: 1_000, availableCapacity: 300, scannedBytes: 700
         ) == nil)
         // Over-accounted (hard links, purgeable churn between the two
         // capacity reads): never a negative synthetic block.
-        #expect(NeodiskViewModel.hiddenSpaceBytes(
+        #expect(FreeSpaceModel.hiddenSpaceBytes(
             totalCapacity: 1_000, availableCapacity: 300, scannedBytes: 900
         ) == nil)
     }

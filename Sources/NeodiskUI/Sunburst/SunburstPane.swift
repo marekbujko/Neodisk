@@ -138,12 +138,12 @@ struct SunburstPane: View {
     /// drills into a subfolder. Unlike the treemap the sunburst shows it
     /// unconditionally for volume scans — no Settings toggle here.
     private var gatedFreeSpaceBytes: Int64? {
-        model.zoomRootID == nil ? model.freeSpaceBytes : nil
+        model.zoomRootID == nil ? model.freeSpace.freeSpaceBytes : nil
     }
 
     /// Hidden space follows the exact same volume/zoom gates as free space.
     private var gatedHiddenSpaceBytes: Int64? {
-        model.zoomRootID == nil ? model.hiddenSpaceBytes : nil
+        model.zoomRootID == nil ? model.freeSpace.hiddenSpaceBytes : nil
     }
 
     private func selectedAncestorIDs(in store: FileTreeStore) -> Set<String> {
