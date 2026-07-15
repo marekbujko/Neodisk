@@ -56,9 +56,9 @@ import NeodiskKit
 
         let model = environment.makeModel(cloudScan: cloudScan)
 
-        #expect(model.cloudDriveAccounts.map(\.id) == [account.id])
+        #expect(model.cloudAccounts.accounts.map(\.id) == [account.id])
         #expect(model.builtInLocations.contains { $0.id == account.id })
-        #expect(model.cloudScan?.accountSubtitle(forTargetID: account.id) == "Fixture Drive")
+        #expect(model.cloudAccounts.integration?.accountSubtitle(forTargetID: account.id) == "Fixture Drive")
     }
 
     @MainActor
@@ -72,15 +72,15 @@ import NeodiskKit
         defer { environment.tearDown() }
         let model = environment.makeModel(cloudScan: cloudScan)
 
-        #expect(model.cloudDriveAccounts.isEmpty)
-        #expect(model.cloudScan?.canConnectAccounts == true)
+        #expect(model.cloudAccounts.accounts.isEmpty)
+        #expect(model.cloudAccounts.integration?.canConnectAccounts == true)
 
         let connected = makeCloudTarget()
         cloudScan.nextConnectResult = connected
-        model.connectCloudAccount(providerID: "google")
+        model.cloudAccounts.connect(providerID: "google")
 
-        try await eventually { model.cloudDriveAccounts.map(\.id) == [connected.id] }
-        #expect(model.cloudDriveAccounts.map(\.id) == [connected.id])
+        try await eventually { model.cloudAccounts.accounts.map(\.id) == [connected.id] }
+        #expect(model.cloudAccounts.accounts.map(\.id) == [connected.id])
     }
 
     @MainActor
@@ -95,12 +95,12 @@ import NeodiskKit
         defer { environment.tearDown() }
         let model = environment.makeModel(cloudScan: cloudScan)
 
-        #expect(model.cloudDriveAccounts.map(\.id) == [account.id])
+        #expect(model.cloudAccounts.accounts.map(\.id) == [account.id])
 
-        model.signOutCloudAccount(targetID: account.id)
+        model.cloudAccounts.signOut(targetID: account.id)
 
-        try await eventually { model.cloudDriveAccounts.isEmpty }
-        #expect(model.cloudDriveAccounts.isEmpty)
+        try await eventually { model.cloudAccounts.accounts.isEmpty }
+        #expect(model.cloudAccounts.accounts.isEmpty)
         #expect(model.cachedScanInfo[account.id] == nil)
     }
 }

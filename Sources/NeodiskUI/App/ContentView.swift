@@ -49,7 +49,7 @@ public struct ContentView: View {
             // composing with NEODISK_CLOUD_FIXTURE for headless cloud runs.
             if let path = ProcessInfo.processInfo.environment["NEODISK_AUTOSCAN"],
                model.coordinator.phase == .idle {
-                if let cloudTarget = model.cloudDriveAccounts.first(where: { $0.id == path }) {
+                if let cloudTarget = model.cloudAccounts.accounts.first(where: { $0.id == path }) {
                     model.startScan(cloudTarget)
                 } else {
                     model.startScan(ScanTarget(url: URL(filePath: path, directoryHint: .isDirectory)))

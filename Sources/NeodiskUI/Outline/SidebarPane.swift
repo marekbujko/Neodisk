@@ -54,15 +54,15 @@ struct SidebarPane: View {
                 }
             }
 
-            if model.cloudScan != nil || !model.cloudDriveAccounts.isEmpty {
+            if model.cloudAccounts.integration != nil || !model.cloudAccounts.accounts.isEmpty {
                 Section("Cloud Drives") {
-                    ForEach(model.cloudDriveAccounts) { target in
+                    ForEach(model.cloudAccounts.accounts) { target in
                         // No Reveal-in-Finder context menu: cloudscan:// IDs
                         // are not filesystem paths, so these rows can't reuse
                         // builtInLocationRow.
                         SidebarTargetRow(
                             target: target,
-                            subtitle: model.cloudScan?.accountSubtitle(forTargetID: target.id) ?? target.id,
+                            subtitle: model.cloudAccounts.integration?.accountSubtitle(forTargetID: target.id) ?? target.id,
                             lastScanned: model.cachedScanInfo[target.id]?.lastScanDate,
                             now: now
                         )
@@ -122,7 +122,7 @@ struct SidebarPane: View {
             presenting: signOutTarget
         ) { target in
             Button("Sign Out", role: .destructive) {
-                model.signOutCloudAccount(targetID: target.id)
+                model.cloudAccounts.signOut(targetID: target.id)
                 signOutTarget = nil
             }
             Button("Cancel", role: .cancel) { signOutTarget = nil }
@@ -201,7 +201,7 @@ struct SidebarPane: View {
     /// persistent-controls rule in AGENTS.md.
     @ViewBuilder
     private var cloudConnectButton: some View {
-        if let items = model.cloudScan?.connectMenuItems, items.isEmpty {
+        if let items = model.cloudAccounts.integration?.connectMenuItems, items.isEmpty {
             sidebarActionLabel(
                 title: "Google Drive: coming soon",
                 systemImage: "externaldrive.badge.plus"
@@ -209,11 +209,11 @@ struct SidebarPane: View {
             .foregroundStyle(.secondary)
             .help("Cloud drive scanning is coming in an upcoming update")
         }
-        if let items = model.cloudScan?.connectMenuItems, !items.isEmpty {
+        if let items = model.cloudAccounts.integration?.connectMenuItems, !items.isEmpty {
             if items.count == 1 {
                 let item = items[0]
                 Button {
-                    model.connectCloudAccount(providerID: item.id)
+                    model.cloudAccounts.connect(providerID: item.id)
                 } label: {
                     sidebarActionLabel(title: item.title, systemImage: "externaldrive.badge.plus")
                 }
@@ -222,7 +222,7 @@ struct SidebarPane: View {
             } else {
                 Menu {
                     ForEach(items, id: \.id) { item in
-                        Button(LocalizedStringKey(item.title)) { model.connectCloudAccount(providerID: item.id) }
+                        Button(LocalizedStringKey(item.title)) { model.cloudAccounts.connect(providerID: item.id) }
                     }
                 } label: {
                     sidebarActionLabel(title: "Connect Cloud Drive…", systemImage: "externaldrive.badge.plus")

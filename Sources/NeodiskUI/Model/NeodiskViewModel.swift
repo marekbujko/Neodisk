@@ -122,15 +122,14 @@ final class NeodiskViewModel {
     /// Locally-synced cloud storage folders (iCloud Drive, File Provider
     /// roots), shown in the sidebar's own "Local Cloud Files" section.
     let cloudLocations = SystemIntegration.cloudTargets()
-    /// Connected remote cloud-drive accounts (CloudScan), shown in the
-    /// sidebar's "Cloud Drives" section. Seeded once from `cloudScan` at
-    /// launch; empty in builds without the CloudScan feature.
-    private(set) var cloudDriveAccounts: [ScanTarget] = []
+    /// Connected remote cloud-drive accounts and their connect/sign-out
+    /// flows; see CloudAccountsModel.
+    let cloudAccounts: CloudAccountsModel
     /// The fixed sidebar locations: volumes, local cloud folders, and remote
     /// cloud-drive accounts. Unlike the Folders section these can never be
     /// removed. Feeding cloud accounts through here joins them into sidebar
     /// selection (`allTargets`), dedup, and the snapshot-cache keep-list.
-    var builtInLocations: [ScanTarget] { volumeLocations + cloudLocations + cloudDriveAccounts }
+    var builtInLocations: [ScanTarget] { volumeLocations + cloudLocations + cloudAccounts.accounts }
     /// What the snapshot cache holds per target path: which locations open
     /// instantly from cache, the sidebar's "Scanned … ago" subtitles, and
     /// how long the last scan took (whether a rescan should auto-start).
@@ -202,9 +201,6 @@ final class NeodiskViewModel {
     /// scans probe the cache optimistically instead of trusting the index.
     @ObservationIgnored private var hasIndexedSnapshotCache = false
     @ObservationIgnored private var preferencesCancellable: AnyCancellable?
-    /// The CloudScan integration, or nil in builds without the feature. Owns
-    /// the sidebar's connected accounts and the cloud scan stream.
-    @ObservationIgnored private(set) var cloudScan: (any CloudScanIntegrating)?
 
     init(
         coordinator: ScanCoordinator = ScanCoordinator(),
@@ -215,9 +211,16 @@ final class NeodiskViewModel {
         self.coordinator = coordinator
         self.snapshotCache = snapshotCache
         self.sidebarFolderStore = sidebarFolderStore
-        self.cloudScan = cloudScan
         self.warnings = ScanWarningsModel(coordinator: coordinator)
         self.freeSpace = FreeSpaceModel(coordinator: coordinator, cloudScan: cloudScan)
+        // Seeds the connected cloud accounts before the keep-list below is
+        // computed, so their persisted snapshots survive the launch prune
+        // (builtInLocations folds cloudAccounts.accounts in).
+        self.cloudAccounts = CloudAccountsModel(
+            coordinator: coordinator,
+            snapshotCache: snapshotCache,
+            integration: cloudScan
+        )
         self.search = SearchModel(coordinator: coordinator, indexService: searchIndexService)
         self.kinds = KindStatsModel(coordinator: coordinator, indexService: searchIndexService)
         self.largest = LargestFilesModel(coordinator: coordinator, indexService: searchIndexService)
@@ -228,6 +231,7 @@ final class NeodiskViewModel {
         sidebarFolders = sidebarFolderStore.load()
         diff.model = self
         changes.model = self
+        cloudAccounts.model = self
 
         // The coordinator is @Observable, so views track its properties
         // (phase, snapshot, …) directly; the model only needs the snapshot
@@ -245,16 +249,6 @@ final class NeodiskViewModel {
             if self.preferences?.autoScanDuplicates == true {
                 self.duplicates.startScan()
             }
-        }
-
-        // Seed the connected cloud accounts before the keep-list below is
-        // computed, so their persisted snapshots survive the launch prune
-        // (builtInLocations already folds cloudDriveAccounts in).
-        cloudDriveAccounts = cloudScan?.accountTargets ?? []
-        // Refresh the sidebar's cloud rows whenever an account is connected
-        // or signed out.
-        self.cloudScan?.onAccountsChanged = { [weak self] in
-            self?.refreshCloudDriveAccounts()
         }
 
         // Drop cache entries for locations no longer in the sidebar and
@@ -939,46 +933,10 @@ final class NeodiskViewModel {
         )
     }
 
-    // MARK: - Cloud accounts
-
-    /// Re-reads the connected cloud accounts after a connect or sign-out. The
-    /// assignment fires observation, so the sidebar's Cloud Drives section
-    /// updates.
-    private func refreshCloudDriveAccounts() {
-        cloudDriveAccounts = cloudScan?.accountTargets ?? []
-    }
-
-    /// Runs the provider's OAuth flow (opening the browser) and, on success,
-    /// scans the new account. Failures surface through the standard action
-    /// alert.
-    func connectCloudAccount(providerID: String) {
-        guard let cloudScan else { return }
-        Task { [weak self] in
-            do {
-                let target = try await cloudScan.connectAccount(providerID: providerID)
-                self?.startScan(target)
-            } catch {
-                self?.actionErrorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    /// Signs out of a connected cloud account: revokes and forgets its
-    /// credentials, drops its cached scan, and clears the display if that
-    /// account is what's on screen.
-    func signOutCloudAccount(targetID: String) {
-        guard let cloudScan else { return }
-        let wasDisplayed = coordinator.selectedTarget?.id == targetID
-        Task { [weak self, snapshotCache] in
-            await cloudScan.signOut(targetID: targetID)
-            await snapshotCache.removeSnapshot(forTargetID: targetID)
-            guard let self else { return }
-            self.cachedScanInfo.removeValue(forKey: targetID)
-            self.coordinator.forgetRecentSnapshot(forTargetID: targetID)
-            if wasDisplayed {
-                self.coordinator.clearScan()
-            }
-        }
+    /// Cache-index bookkeeping for a removed location (a signed-out cloud
+    /// account); moves to the scan session model with the rest of the index.
+    func removeCachedScanInfo(forTargetID targetID: String) {
+        cachedScanInfo.removeValue(forKey: targetID)
     }
 
     // MARK: - Snapshot cache maintenance
