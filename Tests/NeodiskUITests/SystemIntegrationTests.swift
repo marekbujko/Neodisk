@@ -116,12 +116,24 @@ import NeodiskKit
         ])
     }
 
-    @Test func testCapacityDescriptionPrefersGeneralAvailableCapacityWhenImportantUsageIsZero() {
-        let description = SystemIntegration.capacityDescription(
+    @Test func testCapacityDescriptionUsesFinderStyleAvailable() {
+        // Finder counts purgeable space as available (important-usage), so
+        // the sidebar subtitle must too.
+        let description = VolumeSpaceInfo.make(
+            totalCapacity: 2_000_000_000_000,
+            availableCapacity: 512_000_000_000,
+            availableCapacityForImportantUsage: 640_000_000_000
+        ).flatMap(SystemIntegration.capacityDescription(info:))
+
+        #expect(description == "640 GB free of 2 TB")
+    }
+
+    @Test func testCapacityDescriptionFallsBackWhenImportantUsageIsZero() {
+        let description = VolumeSpaceInfo.make(
             totalCapacity: 2_000_000_000_000,
             availableCapacity: 512_000_000_000,
             availableCapacityForImportantUsage: 0
-        )
+        ).flatMap(SystemIntegration.capacityDescription(info:))
 
         #expect(description == "512 GB free of 2 TB")
     }

@@ -65,6 +65,17 @@ import Foundation
         #expect(info?.usedBytes == 600)
     }
 
+    @Test func testMakeTreatsZeroImportantUsageAsAbsent() {
+        // Volumes without important-usage support report 0 there; the plain
+        // figure is the real one.
+        let info = VolumeSpaceInfo.make(
+            totalCapacity: 1_000,
+            availableCapacity: 250,
+            availableCapacityForImportantUsage: 0
+        )
+        #expect(info?.availableCapacity == 250)
+    }
+
     @Test func testMakeFallsBackToPlainAvailable() {
         let info = VolumeSpaceInfo.make(
             totalCapacity: 1_000,

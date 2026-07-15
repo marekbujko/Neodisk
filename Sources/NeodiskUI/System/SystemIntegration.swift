@@ -399,59 +399,16 @@ enum SystemIntegration {
     }
 
     private nonisolated static func capacityDescription(for url: URL) -> String? {
-        let values: URLResourceValues
-        do {
-            values = try url.resourceValues(forKeys: [
-                .volumeTotalCapacityKey,
-                .volumeAvailableCapacityKey,
-                .volumeAvailableCapacityForImportantUsageKey
-            ])
-        } catch {
-            return nil
-        }
-
-        return capacityDescription(
-            totalCapacity: values.volumeTotalCapacity,
-            availableCapacity: values.volumeAvailableCapacity,
-            availableCapacityForImportantUsage: values.volumeAvailableCapacityForImportantUsage
-        )
+        guard let info = VolumeSpaceInfo.load(for: url) else { return nil }
+        return capacityDescription(info: info)
     }
 
-    nonisolated static func capacityDescription(
-        totalCapacity: Int?,
-        availableCapacity: Int?,
-        availableCapacityForImportantUsage: Int64?
-    ) -> String? {
-        guard let totalCapacity,
-              let resolvedAvailableCapacity = resolvedAvailableCapacity(
-                  availableCapacity: availableCapacity,
-                  availableCapacityForImportantUsage: availableCapacityForImportantUsage
-              ) else {
-            return nil
-        }
-
-        let totalText = capacityText(Int64(totalCapacity))
-        let availableText = capacityText(resolvedAvailableCapacity)
+    /// "X free of Y" with the Finder-style available figure: free plus
+    /// purgeable, matching what Finder and Disk Utility call available.
+    nonisolated static func capacityDescription(info: VolumeSpaceInfo) -> String? {
+        let totalText = NeodiskFormatters.size(info.totalCapacity)
+        let availableText = NeodiskFormatters.size(info.availableCapacity)
         return "\(availableText) free of \(totalText)"
-    }
-
-    private nonisolated static func resolvedAvailableCapacity(
-        availableCapacity: Int?,
-        availableCapacityForImportantUsage: Int64?
-    ) -> Int64? {
-        if let availableCapacity {
-            return Int64(availableCapacity)
-        }
-        return availableCapacityForImportantUsage
-    }
-
-    private nonisolated static func capacityText(_ bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB, .useTB]
-        formatter.countStyle = .file
-        formatter.includesActualByteCount = false
-        formatter.isAdaptive = true
-        return formatter.string(fromByteCount: bytes)
     }
 }
 

@@ -77,14 +77,17 @@ public struct VolumeSpaceInfo: Equatable, Sendable {
 
     /// Assembles the info from raw resource values (separated from `load`
     /// for testability).
-    static func make(
+    public static func make(
         totalCapacity: Int?,
         availableCapacity: Int?,
         availableCapacityForImportantUsage: Int64?
     ) -> VolumeSpaceInfo? {
         guard let totalCapacity else { return nil }
         let strictlyFree = availableCapacity.map { Int64(max($0, 0)) }
-        guard let available = availableCapacityForImportantUsage.map({ max($0, 0) }) ?? strictlyFree else {
+        // Volumes that don't support the important-usage figure report 0
+        // there while the plain figure is real — treat 0 as absent.
+        let importantUsage = availableCapacityForImportantUsage.flatMap { $0 > 0 ? $0 : nil }
+        guard let available = importantUsage ?? strictlyFree else {
             return nil
         }
         return VolumeSpaceInfo(
