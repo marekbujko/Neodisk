@@ -406,7 +406,10 @@ public final class IncrementalScanService: Sendable {
         }
         // A replaced root (new folder mounted or restored at the same path)
         // invalidates every node identity below it.
-        if let liveIdentity = try? metadataLoader.metadata(for: target.url).fileIdentity,
+        if let liveIdentity = try? metadataLoader.metadata(
+            for: target.url,
+            captureDirectoryIdentity: true
+        ).fileIdentity,
            let baselineIdentity = baseline.root.fileIdentity,
            liveIdentity != baselineIdentity {
             return .targetMismatch

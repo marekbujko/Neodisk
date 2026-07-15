@@ -229,7 +229,11 @@ nonisolated struct ScanMetadataLoader: Sendable {
         self.fileSystemInfoProvider = fileSystemInfoProvider
     }
 
-    func metadata(for url: URL, includeVolumeDetails: Bool = false) throws -> NodeMetadata {
+    func metadata(
+        for url: URL,
+        includeVolumeDetails: Bool = false,
+        captureDirectoryIdentity: Bool = false
+    ) throws -> NodeMetadata {
         let keys = includeVolumeDetails ? Self.rootResourceKeys : Self.scanResourceKeys
         #if DEBUG
         let start = diagnostics?.start()
@@ -251,7 +255,12 @@ nonisolated struct ScanMetadataLoader: Sendable {
             #endif
             throw error
         }
-        return metadata(for: url, prefetchedResourceValues: values, includeVolumeDetails: includeVolumeDetails)
+        return metadata(
+            for: url,
+            prefetchedResourceValues: values,
+            includeVolumeDetails: includeVolumeDetails,
+            captureDirectoryIdentity: captureDirectoryIdentity
+        )
     }
 
     func atomicSummaryMetadata(for url: URL) throws -> NodeMetadata {
@@ -281,12 +290,14 @@ nonisolated struct ScanMetadataLoader: Sendable {
     nonisolated func metadata(
         for url: URL,
         prefetchedResourceValues values: URLResourceValues,
-        includeVolumeDetails: Bool = false
+        includeVolumeDetails: Bool = false,
+        captureDirectoryIdentity: Bool = false
     ) -> NodeMetadata {
         Self.nodeMetadata(
             for: url,
             resourceValues: values,
             includeVolumeDetails: includeVolumeDetails,
+            captureDirectoryIdentity: captureDirectoryIdentity,
             diagnostics: diagnostics,
             linkCountCapabilityCache: linkCountCapabilityCache,
             fileSystemInfoProvider: fileSystemInfoProvider
@@ -297,6 +308,7 @@ nonisolated struct ScanMetadataLoader: Sendable {
         for url: URL,
         resourceValues values: URLResourceValues,
         includeVolumeDetails: Bool = false,
+        captureDirectoryIdentity: Bool = false,
         diagnostics: ScanDiagnosticsContext? = nil,
         linkCountCapabilityCache: LinkCountCapabilityCache,
         fileSystemInfoProvider: FileSystemInfoProvider
@@ -330,6 +342,13 @@ nonisolated struct ScanMetadataLoader: Sendable {
             let fileSystemInfo = fileSystemInfoProvider(url, diagnostics)
             fileIdentity = fileIdentity ?? fileSystemInfo.identity
             linkCount = values.linkCount.map(UInt64.init) ?? fileSystemInfo.linkCount
+        } else if captureDirectoryIdentity, isDirectory, fileIdentity == nil {
+            // Scan roots ask for directory identity so a rescanned subtree's
+            // root matches the identity the bulk reader records when the same
+            // directory is enumerated as a child, and so the incremental
+            // replaced-root check has something to compare. lstat yields the
+            // same device+inode FileIdentity form as the bulk path.
+            fileIdentity = fileSystemInfoProvider(url, diagnostics).identity
         }
         let volumeUsedCapacity: Int64?
         if includeVolumeDetails,

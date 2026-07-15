@@ -229,7 +229,11 @@ nonisolated final class ScanTraversal {
     func run() async throws -> FileTreeStore {
         try Task.checkCancellation()
 
-        let rootMetadata = try metadataLoader.metadata(for: target.url, includeVolumeDetails: includeVolumeDetails)
+        let rootMetadata = try metadataLoader.metadata(
+            for: target.url,
+            includeVolumeDetails: includeVolumeDetails,
+            captureDirectoryIdentity: true
+        )
         metrics.discoveredItems = 1
         metrics.estimatedTotalBytes = estimatedTotalBytes(for: target, metadata: rootMetadata)
         metrics.currentPath = target.url.path

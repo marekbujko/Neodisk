@@ -170,15 +170,11 @@ struct IncrementalScanServiceTests {
             )
             #expect(a.logicalSize == b.logicalSize, "\(id)", sourceLocation: sourceLocation)
             #expect(a.descendantFileCount == b.descendantFileCount, "\(id)", sourceLocation: sourceLocation)
-            // File identity drives hard-link dedup and must match exactly.
-            // Directory identity is compared by the caller: a rescanned
-            // subtree's root directory has a known splice-vs-full divergence
-            // (the single-URL metadata loader does not capture directory
-            // identity the way the bulk child reader does), so asserting it
-            // here would flag that unrelated gap on every interior directory.
-            if !a.isDirectory {
-                #expect(a.fileIdentity == b.fileIdentity, "\(id)", sourceLocation: sourceLocation)
-            }
+            // Identity drives hard-link dedup for files and rename detection
+            // in scan diffs for directories; both must match a fresh scan,
+            // including a rescanned subtree's root directory (the scan-root
+            // metadata load captures directory identity for exactly this).
+            #expect(a.fileIdentity == b.fileIdentity, "\(id)", sourceLocation: sourceLocation)
             #expect(a.linkCount == b.linkCount, "\(id)", sourceLocation: sourceLocation)
             #expect(a.isPackage == b.isPackage, "\(id)", sourceLocation: sourceLocation)
             #expect(a.isSynthetic == b.isSynthetic, "\(id)", sourceLocation: sourceLocation)
@@ -321,21 +317,10 @@ struct IncrementalScanServiceTests {
         let splicedChangedLink = try #require(rescanned.treeStore.node(id: target.id + "/Z-Changed/shared.bin"))
         #expect(splicedChangedLink.allocatedSize < splicedChangedLink.unduplicatedAllocatedSize)
 
-        // Untouched interior directories keep their baseline identity, so it
-        // matches a fresh scan there.
-        #expect(
-            rescanned.treeStore.node(id: target.id + "/A-Owner")?.fileIdentity
-                == fresh.treeStore.node(id: target.id + "/A-Owner")?.fileIdentity
-        )
-        // Characterizes a known splice-vs-full divergence (see report): the
-        // rescanned subtree's ROOT directory is built from the single-URL
-        // metadata loader, which — unlike the bulk directory reader that
-        // enumerates it as a child in a full scan — does not capture directory
-        // identity. So the spliced Z-Changed directory carries no fileIdentity
-        // where a fresh full scan records its device+inode. This is also
-        // independent proof the splice path (not a full-scan fallback) ran.
-        #expect(rescanned.treeStore.node(id: target.id + "/Z-Changed")?.fileIdentity == nil)
-        #expect(fresh.treeStore.node(id: target.id + "/Z-Changed")?.fileIdentity != nil)
+        // The rescanned subtree's ROOT directory is built by the single-URL
+        // scan-root metadata load, not the bulk child reader — make sure that
+        // path recorded a real identity too, not a matching pair of nils.
+        #expect(rescanned.treeStore.node(id: target.id + "/Z-Changed")?.fileIdentity != nil)
 
         // And the incremental machinery actually ran: history was consulted
         // exactly once over the baseline→cutoff window, advancing the checkpoint.
