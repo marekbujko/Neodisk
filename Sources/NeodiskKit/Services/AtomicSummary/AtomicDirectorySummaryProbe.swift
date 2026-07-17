@@ -128,6 +128,7 @@ extension AtomicDirectorySummarizer {
             } catch {
                 continue
             }
+            let normalizedDirectoryPath = directoryURL.standardizedFileURL.path
 
             for child in children {
                 try cancellationCheck()
@@ -149,7 +150,11 @@ extension AtomicDirectorySummarizer {
                 }
                 guard visitedItems <= maxVisitedItems else { return profile }
 
-                guard !exclusionMatcher.excludes(childURL, isDirectory: childMetadata.isDirectory) else {
+                guard !exclusionMatcher.excludes(
+                    normalizedParentPath: normalizedDirectoryPath,
+                    childName: child.name,
+                    isDirectory: childMetadata.isDirectory
+                ) else {
                     continue
                 }
 

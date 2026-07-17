@@ -52,9 +52,16 @@ private final class ConditionsBox: @unchecked Sendable {
             conditions: .nominal
         )
 
-        #expect(parallel > conservative)
+        // getattrlistbulk self-contends past ~8 concurrent readers, so the
+        // local-SSD bulk ceiling is capped at physical cores but no more than
+        // that knee (PERFORMANCE.md 2026-07-17); it never runs narrower than
+        // the conservative/external profile, which in turn never runs narrower
+        // than network.
+        let cores = max(1, ProcessInfo.processInfo.activeProcessorCount)
+        #expect(parallel == min(max(4, cores), 8))
+        #expect(parallel >= conservative)
         #expect(conservative >= network)
-        #expect(parallel <= 24)
+        #expect(parallel <= 8)
         #expect(conservative <= 8)
         #expect(network <= 4)
     }

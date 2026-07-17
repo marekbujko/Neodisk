@@ -73,6 +73,35 @@ public nonisolated struct ScanExclusionMatcher: Sendable {
         return excludes(normalizedPath: normalizedPath, isDirectory: isDirectory)
     }
 
+    /// Enumeration-hot fast path. The child URL that `excludes(_:isDirectory:)`
+    /// would standardize here was just built from an already-normalized parent
+    /// path plus a single, dot/slash-free name component, so the normalized
+    /// child path is a plain string concatenation — no per-entry URL round trip
+    /// through `standardizedFileURL`'s RFC3986 parse.
+    ///
+    /// `normalizedParentPath` MUST be the parent directory's normalized path
+    /// (`parentURL.standardizedFileURL.path`), computed once per directory.
+    /// `childName` MUST be a single path component as a directory enumerator
+    /// yields it: no "/", and never "." or "..". Under those preconditions the
+    /// verdict is identical to `excludes(parentURL.appending(path: childName), …)`.
+    func excludes(normalizedParentPath: String, childName: String, isDirectory: Bool) -> Bool {
+        excludes(
+            normalizedPath: Self.normalizedChildPath(parentPath: normalizedParentPath, childName: childName),
+            isDirectory: isDirectory
+        )
+    }
+
+    /// Joins a normalized parent path and a clean child component into the
+    /// normalized child path, matching `standardizedFileURL.path` for the
+    /// appended URL. The parent is normalized, so it has no trailing slash
+    /// except when it is the volume root "/".
+    static func normalizedChildPath(parentPath: String, childName: String) -> String {
+        if parentPath == "/" {
+            return "/" + childName
+        }
+        return parentPath + "/" + childName
+    }
+
     private func excludes(normalizedPath: String, isDirectory: Bool) -> Bool {
         if excludesCloudStorage(path: normalizedPath) {
             return true
@@ -186,18 +215,54 @@ public nonisolated struct ScanExclusionMatcher: Sendable {
         return isUsersCloudPath(rootPath, userRelativeComponents: userRelativeComponents)
     }
 
+    /// True when `path` is `/Users/<any-user>/<userRelativeComponents…>` or a
+    /// descendant of it. Runs per enumerated entry on broad scans, so it walks
+    /// the "/"-separated components over the UTF8 view directly rather than
+    /// allocating a `[String]` per call (equivalent to
+    /// `path.split(separator: "/")`: consecutive/leading/trailing slashes are
+    /// ignored; component 1, the user, is a wildcard).
     fileprivate static func isUsersCloudPath(
         _ path: String,
         userRelativeComponents: [String]
     ) -> Bool {
-        let components = pathComponents(path)
-        guard components.count >= 2 + userRelativeComponents.count else { return false }
-        guard components[0] == "Users" else { return false }
-        for (offset, expected) in userRelativeComponents.enumerated()
-        where components[2 + offset] != expected {
-            return false
+        let requiredComponentCount = 2 + userRelativeComponents.count
+        let utf8 = path.utf8
+        let slash = UInt8(ascii: "/")
+        let end = utf8.endIndex
+        var cursor = utf8.startIndex
+        var componentIndex = 0
+
+        while true {
+            while cursor != end, utf8[cursor] == slash {
+                cursor = utf8.index(after: cursor)
+            }
+            guard cursor != end else { break }
+            let componentStart = cursor
+            while cursor != end, utf8[cursor] != slash {
+                cursor = utf8.index(after: cursor)
+            }
+            let component = utf8[componentStart..<cursor]
+
+            if componentIndex == 0 {
+                guard component.elementsEqual("Users".utf8) else { return false }
+            } else if componentIndex >= 2 {
+                let expectedIndex = componentIndex - 2
+                if expectedIndex < userRelativeComponents.count {
+                    guard component.elementsEqual(userRelativeComponents[expectedIndex].utf8) else {
+                        return false
+                    }
+                }
+            }
+
+            componentIndex += 1
+            // Every required component (index 0 and 2…required-1) has now been
+            // validated; any additional components only make `path` a descendant.
+            if componentIndex >= requiredComponentCount {
+                return true
+            }
         }
-        return true
+
+        return componentIndex >= requiredComponentCount
     }
 
     private static func pathComponents(_ path: String) -> [String] {

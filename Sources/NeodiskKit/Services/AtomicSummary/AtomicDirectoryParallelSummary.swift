@@ -288,6 +288,7 @@ extension AtomicDirectorySummarizer {
             ofDirectory: item.url,
             cancellationCheck: cancellationCheck
         )
+        let normalizedParentPath = item.url.standardizedFileURL.path
 
         for child in bulkChildren {
             try cancellationCheck()
@@ -312,7 +313,11 @@ extension AtomicDirectorySummarizer {
                 }
                 continue
             }
-            guard !exclusionMatcher.excludes(childURL, isDirectory: childMetadata.isDirectory) else {
+            guard !exclusionMatcher.excludes(
+                normalizedParentPath: normalizedParentPath,
+                childName: child.name,
+                isDirectory: childMetadata.isDirectory
+            ) else {
                 continue
             }
 

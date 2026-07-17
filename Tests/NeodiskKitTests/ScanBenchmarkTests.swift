@@ -12,6 +12,18 @@ import Foundation
 //
 // Grep for `NEODISK_BENCH result` / `NEODISK_BENCH best` to collect numbers.
 //
+// Collect numbers in RELEASE configuration — the shipped app builds
+// `-c release`, and `swift test`'s default debug (-Onone) inflates the
+// CPU-heavy scan phases 1.5-2.2x non-uniformly across fixtures (measured
+// 2026-07-17), so debug timings can show phantom regressions or hide real
+// wins. The canonical run:
+//
+//   NEODISK_BENCH=1 swift test -c release --filter ScanBenchmarkTests
+//
+// (The CLT lib_TestingInterop linker flags in Package.swift apply to every
+// configuration, so release test runs link fine.) Debug runs stay useful
+// for correctness iteration, just not for numbers anyone quotes.
+//
 // The suite is `.serialized` so concurrently running benchmarks never contend
 // for the same cores while being timed (see AGENTS.md: timing-sensitive suites
 // run serialized).

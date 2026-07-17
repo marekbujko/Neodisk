@@ -330,13 +330,18 @@ extension ScanEngine {
         let enumerationStart = DispatchTime.now().uptimeNanoseconds
         #endif
         var entries: [DirectoryEntry] = []
+        // Normalize the parent path once per directory. The per-child exclusion
+        // and name gates then work on strings — `parent + "/" + name` — instead
+        // of rebuilding and re-standardizing a URL for every entry, and the URL
+        // itself is only constructed for entries that survive filtering.
+        let normalizedParentPath = url.standardizedFileURL.path
         let enumeratedItemCount = try BulkDirectoryReader.readChildren(
             ofDirectory: url,
             using: context,
             cancellationCheck: cancellationCheck
         ) { child in
             if !includeHiddenFiles && child.isHidden { return }
-            guard includedChildName(child.name, under: url, behavior: behavior) else { return }
+            guard includedChildName(child.name, underParentPath: normalizedParentPath, behavior: behavior) else { return }
 
             if let entryErrno = child.entryErrno {
                 let childURL = url.appending(path: child.name)
@@ -355,11 +360,15 @@ extension ScanEngine {
             }
 
             guard let metadata = child.metadata else { return }
+            guard !exclusionMatcher.excludes(
+                normalizedParentPath: normalizedParentPath,
+                childName: child.name,
+                isDirectory: metadata.isDirectory
+            ) else { return }
             let childURL = url.appending(
                 path: child.name,
                 directoryHint: metadata.isDirectory ? .isDirectory : .notDirectory
             )
-            guard !exclusionMatcher.excludes(childURL, isDirectory: metadata.isDirectory) else { return }
             entries.append(DirectoryEntry(
                 url: childURL,
                 metadata: metadata,
@@ -519,8 +528,12 @@ extension ScanEngine {
     }
 
     nonisolated static func includedChildName(_ childName: String, under parentURL: URL, behavior: ScanBehavior) -> Bool {
-        let parentPath = parentURL.path
+        includedChildName(childName, underParentPath: parentURL.path, behavior: behavior)
+    }
 
+    /// Enumeration-hot overload: the parent path is computed once per directory
+    /// by the caller instead of `parentURL.path` per child.
+    nonisolated static func includedChildName(_ childName: String, underParentPath parentPath: String, behavior: ScanBehavior) -> Bool {
         if parentPath == "/" && [".nofollow", ".resolve"].contains(childName) {
             return false
         }

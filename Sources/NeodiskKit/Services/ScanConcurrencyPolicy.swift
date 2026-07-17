@@ -159,10 +159,15 @@ nonisolated enum ScanConcurrencyPolicy {
         if bulkEnumeration {
             switch sourceProfile {
             case .localParallel:
+                // getattrlistbulk self-contends in the kernel past ~8 concurrent
+                // readers: on `~` (1.6M files) traversal wall was 59-65s at 20
+                // workers vs 36-44s at 8 while summed sys CPU ballooned 56→64s
+                // for zero wall gain (PERFORMANCE.md, 2026-07-17). Cap width at
+                // physical cores but no more than that contention knee.
                 return hardwareAwareWorkerLimit(
-                    minimum: 8,
-                    processorMultiplier: 2,
-                    maximum: 24,
+                    minimum: 4,
+                    processorMultiplier: 1,
+                    maximum: 8,
                     conditions: conditions
                 )
             case .localConservative:
