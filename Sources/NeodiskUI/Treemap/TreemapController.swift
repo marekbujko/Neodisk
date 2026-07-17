@@ -445,6 +445,11 @@ final class TreemapController {
             self.image = result.1
             self.renderedScale = scale
             self.pushDisplay(contentsChanged: true)
+            // Felt-time: the map's pixels just reached the layer tree. This is
+            // the honest "tree displayed" moment for the current snapshot.
+            if result.1 != nil {
+                FeltTiming.noteTreemapDisplayed(snapshotID: self.inputs.snapshotID)
+            }
             // The viewport may have moved on while this render was in
             // flight; chase it until display and viewport agree.
             self.renderIfViewportMoved()

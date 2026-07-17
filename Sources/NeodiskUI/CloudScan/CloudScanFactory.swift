@@ -35,6 +35,7 @@ enum CloudScanFactory {
         // thing a headless run must never do. An empty in-memory store keeps
         // captures deterministic; the fixture provider is unaffected.
         let headlessCapture = environment["NEODISK_UI_SNAPSHOT"] != nil
+            || environment["NEODISK_HEADLESS"] == "1"
             || CommandLine.arguments.contains("--render-png")
         func makeTokenStore() -> any TokenStoring {
             headlessCapture ? InMemoryTokenStore() : KeychainTokenStore()

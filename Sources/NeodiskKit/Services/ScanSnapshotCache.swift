@@ -97,6 +97,12 @@ public actor ScanSnapshotCache {
     private let isLoggingEnabled: Bool
 
     public nonisolated static var defaultDirectoryURL: URL {
+        // Dev/bench hook: NEODISK_SNAPSHOT_DIR isolates the on-disk snapshot
+        // cache so a bench run never reads or clobbers the developer's real
+        // cache (and a rescan bench can seed a clean baseline it controls).
+        if let override = ProcessInfo.processInfo.environment["NEODISK_SNAPSHOT_DIR"] {
+            return URL(filePath: override, directoryHint: .isDirectory)
+        }
         let applicationSupportURL = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask

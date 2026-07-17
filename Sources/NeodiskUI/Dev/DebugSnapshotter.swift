@@ -19,7 +19,7 @@ import SwiftUI
 struct SnapshotWindowHider: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
-        guard ProcessInfo.processInfo.environment["NEODISK_UI_SNAPSHOT"] != nil else {
+        guard HeadlessMode.isOffscreen else {
             return view
         }
         // Poll for the window instead of relying on updateNSView: SwiftUI
@@ -41,8 +41,7 @@ struct SnapshotWindowHider: NSViewRepresentable {
     }
 
     func updateNSView(_ view: NSView, context: Context) {
-        guard ProcessInfo.processInfo.environment["NEODISK_UI_SNAPSHOT"] != nil,
-              let window = view.window else { return }
+        guard HeadlessMode.isOffscreen, let window = view.window else { return }
         Self.hide(window)
     }
 

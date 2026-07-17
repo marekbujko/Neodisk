@@ -59,7 +59,33 @@ Swift/SwiftUI practices and keep the scanning core UI-free.
     assembly, first partial, replay, splice, snapshot encode/decode). The
     format is a parsing contract for measurement tooling; `diskscan
     --bench-rescan [--bench-touch <file>]` exercises the full
-    incremental-rescan pipeline under it.
+    incremental-rescan pipeline under it. In the app this also emits
+    app-level *felt-time* marks (`phase=app.launchToScanStart`,
+    `app.firstPartialDisplayed`, `app.scanFinishedToTreeDisplayed`,
+    `app.feltTotal`, each tagged `mode=full|restore|rescan`) — process launch
+    and the UI tail (splice apply, treemap layout, first render) the engine
+    phases don't cover. See `INSTRUCTIONS/scripts/app-bench.sh`.
+  - `NEODISK_HEADLESS=1` — run the real app entirely off-screen for felt-time
+    benchmarking: accessory activation (no Dock icon, never activates), the
+    window moved offscreen and kept transparent, and the in-memory CloudScan
+    token store — the same offscreen machinery as `NEODISK_UI_SNAPSHOT` but
+    with no capture. A bench run that could draw on screen is a bug; this is
+    the switch that prevents it. Compose with `NEODISK_AUTOSCAN` +
+    `NEODISK_SCAN_TIMING=1` + `NEODISK_BENCH_AUTOQUIT=1`.
+  - `NEODISK_BENCH_AUTOQUIT=1` — `NSApp.terminate` cleanly once the final
+    felt-time mark has flushed (the scanned/rescanned/restored tree is on the
+    map), so a harness measures a real launch→quit lifecycle.
+  - `NEODISK_BENCH_RESCANS=<n>` / `NEODISK_BENCH_RESCAN_INTERVAL=<seconds>` —
+    after the `NEODISK_AUTOSCAN` scan displays, wait the interval (default 60,
+    so real fs-event churn accumulates) then trigger an in-app `rescan()` and
+    repeat `n` times, quitting after the last. Measures felt rescan cost with
+    the baseline in memory (no relaunch, no snapshot decode) — the honest
+    "hit Rescan a minute later" path. Compose with `NEODISK_INCREMENTAL=0` for
+    the full-retraverse head-to-head. FeltTiming emits one `app.*` episode per
+    rescan (`mode=rescan`).
+  - `NEODISK_SNAPSHOT_DIR=<dir>` — override the on-disk snapshot-cache
+    directory, isolating a bench run from the developer's real cache (and
+    letting a rescan bench seed a clean baseline it controls).
   - `Neodisk --render-png <scan-path> <out.png> [scale fx fy]` — headless
     treemap render for verifying visual changes.
   - `NEODISK_UI_SNAPSHOT=<out.png>` — offscreen window capture with zoom.

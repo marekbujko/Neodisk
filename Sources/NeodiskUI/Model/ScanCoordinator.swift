@@ -248,6 +248,7 @@ final class ScanCoordinator {
               snapshot?.isComplete != true else {
             return
         }
+        FeltTiming.noteCachedSnapshotDisplayed()
         apply(snapshot: cached)
         completedScanSnapshot = cached
         displaySource = .cachedWhileRefreshing(scanDate: cached.finishedAt ?? cached.startedAt)
@@ -260,6 +261,8 @@ final class ScanCoordinator {
     func beginSnapshotRestore(_ target: ScanTarget, prepare: () -> Void = {}) {
         stopScan(resetState: false)
         prepare()
+
+        FeltTiming.noteScanStart(restore: true)
 
         selectedTarget = target
         phase = .restoring
@@ -304,6 +307,13 @@ final class ScanCoordinator {
     ) {
         stopScan(resetState: false)
         prepare()
+
+        // Felt-time: full vs rescan is resolved by whether a cached map shows
+        // before the engine finishes (see FeltTiming), not by the branch taken.
+        FeltTiming.noteScanStart()
+        if retainedSnapshot != nil {
+            FeltTiming.noteCachedSnapshotDisplayed()
+        }
 
         selectedTarget = target
         phase = .scanning
@@ -415,6 +425,7 @@ final class ScanCoordinator {
         stopScan(resetState: false)
         prepare()
 
+        FeltTiming.noteRestoreCompleted(snapshotID: snapshot.id)
         selectedTarget = snapshot.target
         scanErrorMessage = nil
         resetProgressThrottling()
@@ -654,6 +665,7 @@ final class ScanCoordinator {
         guard activeScanID == scanID else { return }
 
         flushPendingProgress(scanID: scanID)
+        FeltTiming.noteEngineFinished(snapshotID: snapshot.id)
         apply(snapshot: snapshot)
         completedScanSnapshot = snapshot
         displaySource = .liveStreaming

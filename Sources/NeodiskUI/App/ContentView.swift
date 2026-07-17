@@ -54,6 +54,10 @@ public struct ContentView: View {
                 } else {
                     model.startScan(ScanTarget(url: URL(filePath: path, directoryHint: .isDirectory)))
                 }
+                // Dev/bench hook: NEODISK_BENCH_RESCANS drives repeated in-app
+                // rescans of the just-started scan to measure felt rescan cost
+                // with the baseline in memory (no relaunch/decode).
+                BenchRescanDriver.shared.startIfRequested(model: model)
             }
             // Dev/testing hook: NEODISK_ANALYSIS_TAB=<kinds|largest|age|duplicates>
             // opens that statistics tab, so headless snapshots can capture

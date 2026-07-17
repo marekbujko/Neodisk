@@ -237,10 +237,18 @@ final class NeodiskViewModel {
         }
 
         // Drop cache entries for locations no longer in the sidebar and
-        // learn which targets can open instantly from cache.
-        session.pruneAndIndexCache(
-            keepingTargetIDs: Set((builtInLocations + sidebarFolders).map(\.id))
-        )
+        // learn which targets can open instantly from cache. A NEODISK_AUTOSCAN
+        // dev-hook target is kept too even when it is not a sidebar location,
+        // so a bench relaunch (app-bench.sh --rescan) finds the baseline the
+        // previous run persisted instead of having it pruned as an orphan.
+        var keepTargetIDs = Set((builtInLocations + sidebarFolders).map(\.id))
+        if let path = ProcessInfo.processInfo.environment["NEODISK_AUTOSCAN"],
+           !path.contains("://") {
+            keepTargetIDs.insert(
+                ScanTarget(url: URL(filePath: path, directoryHint: .isDirectory)).id
+            )
+        }
+        session.pruneAndIndexCache(keepingTargetIDs: keepTargetIDs)
     }
 
     /// Selecting a location: the scan session picks the restore / refresh /

@@ -14,17 +14,34 @@ import Foundation
 ///
 /// Phases are coarse (traversal, assembly, splice, encode…), never
 /// per-entry, so enabling the instrumentation cannot skew what it measures.
-nonisolated enum ScanTiming {
-    static let isEnabled = ProcessInfo.processInfo.environment["NEODISK_SCAN_TIMING"] == "1"
+///
+/// The UI layer (felt-time `app.*` marks in NeodiskUI) emits through this same
+/// type so the line format stays defined in one place; hence the public API.
+public nonisolated enum ScanTiming {
+    public static let isEnabled = ProcessInfo.processInfo.environment["NEODISK_SCAN_TIMING"] == "1"
+
+    /// A process-wide CPU reading (user, system) in milliseconds, captured at
+    /// a phase boundary. Callers hold one at a phase's start and hand it back
+    /// to `record(_:_:cpuSince:detail:)` so the emitted line carries the CPU
+    /// spent across the felt interval, not just wall time.
+    public struct CPUSnapshot: Sendable {
+        let user: Double
+        let system: Double
+    }
+
+    public static func cpuSnapshot() -> CPUSnapshot {
+        let (user, system) = processCPUMilliseconds()
+        return CPUSnapshot(user: user, system: system)
+    }
 
     /// One-off context line (worker limits, derating events) — same prefix,
     /// no ms field, ignored by the stats parser.
-    static func note(_ text: String) {
+    public static func note(_ text: String) {
         guard isEnabled else { return }
         FileHandle.standardError.write(Data(("NEODISK_SCAN_TIMING note " + text + "\n").utf8))
     }
 
-    static func record(_ phase: String, _ duration: Duration, detail: String = "") {
+    public static func record(_ phase: String, _ duration: Duration, detail: String = "") {
         guard isEnabled else { return }
         let milliseconds = Double(duration.components.seconds) * 1000
             + Double(duration.components.attoseconds) / 1e15
@@ -33,6 +50,31 @@ nonisolated enum ScanTiming {
             line += " " + detail
         }
         FileHandle.standardError.write(Data((line + "\n").utf8))
+    }
+
+    /// As `record`, but appends `cpuUserMs=/cpuSysMs=` for the CPU spent
+    /// between two snapshots — the same detail fields the engine's `measure`
+    /// helper emits, so felt marks and engine phases parse identically. Pass
+    /// nil for either bound to omit the CPU fields (e.g. a launch mark whose
+    /// interval predates our first CPU reading).
+    public static func record(
+        _ phase: String,
+        _ duration: Duration,
+        cpuFrom start: CPUSnapshot?,
+        to end: CPUSnapshot?,
+        detail: String = ""
+    ) {
+        guard isEnabled else { return }
+        var full = detail
+        if let start, let end {
+            let cpu = String(
+                format: "cpuUserMs=%.1f cpuSysMs=%.1f",
+                end.user - start.user,
+                end.system - start.system
+            )
+            full = full.isEmpty ? cpu : full + " " + cpu
+        }
+        record(phase, duration, detail: full)
     }
 
     static func measure<T>(

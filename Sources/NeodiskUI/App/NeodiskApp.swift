@@ -31,12 +31,13 @@ public struct NeodiskApp: App {
 
         // Running via `swift run` there is no app bundle, so opt into being a
         // regular foreground app with a menu bar and key window — unless a
-        // headless snapshot is requested (NEODISK_UI_SNAPSHOT), in which case
-        // stay an accessory app and never activate, so the capture window
-        // does not appear on screen or steal focus (it is also moved offscreen
-        // and kept transparent; see SnapshotWindowHider).
+        // headless run is requested (NEODISK_UI_SNAPSHOT capture or a
+        // NEODISK_HEADLESS bench run), in which case stay an accessory app and
+        // never activate, so the window does not appear on screen or steal
+        // focus (it is also moved offscreen and kept transparent; see
+        // SnapshotWindowHider and HeadlessMode).
         let app = NSApplication.shared
-        if ProcessInfo.processInfo.environment["NEODISK_UI_SNAPSHOT"] != nil {
+        if HeadlessMode.isOffscreen {
             if app.activationPolicy() != .accessory {
                 app.setActivationPolicy(.accessory)
             }
