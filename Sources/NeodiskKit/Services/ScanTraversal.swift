@@ -253,6 +253,7 @@ nonisolated final class ScanTraversal {
         workStack = [
             ScanWorkItem(
                 url: target.url,
+                path: target.url.path,
                 metadata: rootMetadata,
                 localizedEnumerationError: nil,
                 isDirectoryHint: nil,
@@ -303,7 +304,7 @@ nonisolated final class ScanTraversal {
                       let item = workStack.popLast() {
                     try Task.checkCancellation()
 
-                    guard seenScannedNodeIDs.insert(item.url.path).inserted else {
+                    guard seenScannedNodeIDs.insert(item.path).inserted else {
                         releasePendingDirectoryIfNeeded(for: item)
                         recordDuplicateNode(at: item.url, weight: item.weight)
                         continue
@@ -337,7 +338,7 @@ nonisolated final class ScanTraversal {
                             continue
                         }
                     }
-                    metrics.currentPath = item.url.path
+                    metrics.currentPath = item.path
 
                     if shouldTraverseDirectory(
                         metadata: meta,
@@ -528,7 +529,7 @@ nonisolated final class ScanTraversal {
             if offset.isMultiple(of: 256) {
                 try cancellationCheck()
             }
-            let nodeID = entry.url.path
+            let nodeID = entry.path
             guard seenNodeIDs.insert(nodeID).inserted else {
                 batch.duplicateWarnings.append(
                     ScanWarningFactory.makeDuplicateNodeWarning(for: entry.url)
@@ -544,7 +545,7 @@ nonisolated final class ScanTraversal {
                 continue
             }
 
-            let node = summarizer.makeFileNode(url: entry.url, metadata: metadata)
+            let node = summarizer.makeFileNode(path: entry.path, name: entry.name, metadata: metadata)
             batch.nodes.append(node)
             if !node.isSymbolicLink {
                 batch.fileCount += 1
@@ -686,7 +687,7 @@ nonisolated final class ScanTraversal {
         )
         #endif
 
-        metrics.currentPath = item.url.path
+        metrics.currentPath = item.path
         metrics.discoveredItems += childEntries.count
         metrics.enumeratedDirectoryCount += 1
         releasePendingDirectoryIfNeeded(for: item)
@@ -776,6 +777,7 @@ nonisolated final class ScanTraversal {
             workStack.append(
                 ScanWorkItem(
                     url: childEntry.url,
+                    path: childEntry.path,
                     metadata: childEntry.metadata,
                     localizedEnumerationError: childEntry.localizedEnumerationError,
                     isDirectoryHint: childEntry.isDirectoryHint,
@@ -833,7 +835,7 @@ nonisolated final class ScanTraversal {
 
         // Treat as atomic: create a leaf node with summary stats.
         let atomicNode = FileNodeRecord(
-            id: item.url.path,
+            id: item.path,
             url: item.url,
             name: ScanTarget.displayName(for: item.url),
             isDirectory: true,
@@ -909,7 +911,7 @@ nonisolated final class ScanTraversal {
         maybeEmitProgress()
 
         let inaccessibleNode = FileNodeRecord(
-            id: item.url.path,
+            id: item.path,
             url: item.url,
             name: ScanTarget.displayName(for: item.url),
             isDirectory: true,

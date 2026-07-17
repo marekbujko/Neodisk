@@ -66,7 +66,7 @@ extension AtomicDirectorySummarizer {
             visitedItems += 1
             if visitedItems == 1 || visitedItems.isMultiple(of: 64) {
                 emitProgressHeartbeat(
-                    currentURL: childURL,
+                    currentPath: childURL.path,
                     metrics: &metrics,
                     continuation: continuation,
                     emissionState: &emissionState
@@ -153,7 +153,7 @@ extension AtomicDirectorySummarizer {
             try cancellationCheck()
             if index == 0 || index.isMultiple(of: 64) {
                 emitProgressHeartbeat(
-                    currentURL: childEntry.url,
+                    currentPath: childEntry.path,
                     metrics: &metrics,
                     continuation: continuation,
                     emissionState: &emissionState
@@ -307,7 +307,7 @@ extension AtomicDirectorySummarizer {
     }
 
     nonisolated private func accumulateAtomicFile(_ metadata: NodeMetadata, url: URL, into state: AtomicDirectorySummaryState) {
-        state.partial.accumulateFile(metadata, url: url, ownerNodeID: state.ownerNodeID)
+        state.partial.accumulateFile(metadata, path: url.path, ownerNodeID: state.ownerNodeID)
     }
 
     nonisolated private func makeAtomicSummary(from state: AtomicDirectorySummaryState) -> AtomicDirectorySummary {
@@ -315,7 +315,7 @@ extension AtomicDirectorySummarizer {
     }
 
     nonisolated func emitProgressHeartbeat(
-        currentURL: URL,
+        currentPath: String,
         metrics: inout ScanMetrics,
         continuation: AsyncThrowingStream<ScanProgressEvent, Error>.Continuation,
         emissionState: inout ScanEmissionState
@@ -324,11 +324,11 @@ extension AtomicDirectorySummarizer {
         // the shared heartbeat so emissions carry the scan loop's fresh,
         // monotonic metrics instead of this task's stale local snapshot.
         if let summaryPool {
-            summaryPool.emit(currentPath: currentURL.path)
+            summaryPool.emit(currentPath: currentPath)
             return
         }
 
-        metrics.currentPath = currentURL.path
+        metrics.currentPath = currentPath
         let now = Date()
         guard now.timeIntervalSince(emissionState.lastProgressEmission) >= 0.15 else { return }
 

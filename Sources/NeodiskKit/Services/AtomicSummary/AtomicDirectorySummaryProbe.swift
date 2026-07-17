@@ -18,13 +18,20 @@ extension AtomicDirectorySummarizer {
     }
 
     nonisolated static func isNodeDependencyLayoutDirectory(at url: URL) -> Bool {
-        let name = url.lastPathComponent
+        isNodeDependencyLayoutDirectory(
+            childName: url.lastPathComponent,
+            parentName: url.deletingLastPathComponent().lastPathComponent
+        )
+    }
+
+    /// Name-based form for the bulk probe, which holds each child's name and
+    /// its parent directory's name without building a per-child `URL`.
+    nonisolated static func isNodeDependencyLayoutDirectory(childName name: String, parentName: String) -> Bool {
         if name == "node_modules" || name == ".pnpm" {
             return true
         }
 
         guard name.hasPrefix("@") else { return false }
-        let parentName = url.deletingLastPathComponent().lastPathComponent
         return parentName == "node_modules" || parentName == ".pnpm"
     }
 
@@ -129,6 +136,7 @@ extension AtomicDirectorySummarizer {
                 continue
             }
             let normalizedDirectoryPath = directoryURL.standardizedFileURL.path
+            let directoryName = directoryURL.lastPathComponent
 
             for child in children {
                 try cancellationCheck()
@@ -136,13 +144,12 @@ extension AtomicDirectorySummarizer {
                 guard let childMetadata = child.metadata else { continue }
 
                 visitedItems += 1
-                let childURL = directoryURL.appending(
-                    path: child.name,
-                    directoryHint: childMetadata.isDirectory ? .isDirectory : .notDirectory
-                )
                 if visitedItems == 1 || visitedItems.isMultiple(of: 64) {
+                    let childPath = normalizedDirectoryPath == "/"
+                        ? "/" + child.name
+                        : normalizedDirectoryPath + "/" + child.name
                     emitProgressHeartbeat(
-                        currentURL: childURL,
+                        currentPath: childPath,
                         metrics: &metrics,
                         continuation: continuation,
                         emissionState: &emissionState
@@ -158,7 +165,7 @@ extension AtomicDirectorySummarizer {
                     continue
                 }
 
-                if Self.isNodeDependencyLayoutDirectory(at: childURL) {
+                if Self.isNodeDependencyLayoutDirectory(childName: child.name, parentName: directoryName) {
                     profile.observedNodeDependencyLayout = true
                 }
 
@@ -172,7 +179,10 @@ extension AtomicDirectorySummarizer {
                        profile.observedDirectoryCount >= Self.directoryOnlyProbeLimit(minFileCount: minFileCount) {
                         return profile
                     }
-                    directoryStack.append(childURL)
+                    // Only directories need a URL — to recurse into them.
+                    directoryStack.append(
+                        directoryURL.appending(path: child.name, directoryHint: .isDirectory)
+                    )
                     continue
                 }
                 guard !childMetadata.isSymbolicLink else { continue }
@@ -263,7 +273,7 @@ extension AtomicDirectorySummarizer {
             visitedItems += 1
             if visitedItems == 1 || visitedItems.isMultiple(of: 64) {
                 emitProgressHeartbeat(
-                    currentURL: childURL,
+                    currentPath: childURL.path,
                     metrics: &metrics,
                     continuation: continuation,
                     emissionState: &emissionState

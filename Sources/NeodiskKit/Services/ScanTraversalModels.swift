@@ -60,6 +60,10 @@ extension ScanTraversal {
     /// a directory's weight is split among its children when it is enumerated.
     struct ScanWorkItem: Sendable {
         let url: URL
+        /// The item's absolute path (node id), materialized once at enumeration
+        /// time and carried here so the coordinator loop dedupes and stamps
+        /// current-path without re-deriving `url.path` per popped item.
+        let path: String
         let metadata: NodeMetadata?
         let localizedEnumerationError: Error?
         let isDirectoryHint: Bool?

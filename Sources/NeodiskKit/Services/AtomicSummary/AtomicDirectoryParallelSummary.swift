@@ -92,9 +92,9 @@ nonisolated private final class AtomicSummaryAccumulator: @unchecked Sendable {
         lock.unlock()
     }
 
-    func accumulateFile(_ metadata: NodeMetadata, url: URL, ownerNodeID: String) {
+    func accumulateFile(_ metadata: NodeMetadata, path: String, ownerNodeID: String) {
         lock.lock()
-        partial.accumulateFile(metadata, url: url, ownerNodeID: ownerNodeID)
+        partial.accumulateFile(metadata, path: path, ownerNodeID: ownerNodeID)
         lock.unlock()
     }
 
@@ -120,7 +120,7 @@ nonisolated private final class AtomicSummaryProgressReporter: @unchecked Sendab
         self.continuation = continuation
     }
 
-    func emit(currentURL: URL) {
+    func emit(currentPath: String) {
         lock.lock()
         let now = Date()
         guard !hasEmitted || now.timeIntervalSince(lastEmission) >= 0.15 else {
@@ -128,7 +128,7 @@ nonisolated private final class AtomicSummaryProgressReporter: @unchecked Sendab
             return
         }
 
-        metrics.currentPath = currentURL.path
+        metrics.currentPath = currentPath
         lastEmission = now
         hasEmitted = true
         continuation.yield(.progress(metrics))
@@ -186,15 +186,15 @@ extension AtomicDirectorySummarizer {
 
                         do {
                             let sink = AtomicSummaryLevelSink(
-                                onVisit: { childURL in
+                                onVisit: { childPath in
                                     let visitedItemCount = accumulator.recordVisitedItem()
                                     if visitedItemCount == 1 || visitedItemCount.isMultiple(of: 64) {
-                                        progressReporter.emit(currentURL: childURL)
+                                        progressReporter.emit(currentPath: childPath)
                                     }
                                 },
                                 onAccessibility: { accumulator.updateAccessibility($0) },
                                 onWarning: { accumulator.recordWarning(for: $0, error: $1) },
-                                onFile: { accumulator.accumulateFile($0, url: $1, ownerNodeID: item.ownerNodeID) },
+                                onFile: { accumulator.accumulateFile($0, path: $1, ownerNodeID: item.ownerNodeID) },
                                 onSubdirectory: { queue.enqueue($0) }
                             )
                             try Self.processDirectoryLevel(
@@ -289,25 +289,25 @@ extension AtomicDirectorySummarizer {
             cancellationCheck: cancellationCheck
         )
         let normalizedParentPath = item.url.standardizedFileURL.path
+        // `item.url.path` (not standardized) so claim keys / recursion identity
+        // match the rest of the tree; child path is `basePath + "/" + name`.
+        let basePath = item.url.path
 
         for child in bulkChildren {
             try cancellationCheck()
             if !includeHiddenFiles && child.isHidden { continue }
 
-            let childURL = item.url.appending(
-                path: child.name,
-                directoryHint: child.metadata?.isDirectory == true ? .isDirectory : .notDirectory
-            )
-            sink.onVisit(childURL)
+            let childPath = basePath == "/" ? "/" + child.name : basePath + "/" + child.name
+            sink.onVisit(childPath)
 
             guard let childMetadata = child.metadata else {
                 if let entryErrno = child.entryErrno {
                     sink.onWarning(
-                        childURL,
+                        URL(filePath: childPath),
                         NSError(
                             domain: NSPOSIXErrorDomain,
                             code: Int(entryErrno),
-                            userInfo: [NSURLErrorKey: childURL]
+                            userInfo: [NSURLErrorKey: URL(filePath: childPath)]
                         )
                     )
                 }
@@ -324,7 +324,7 @@ extension AtomicDirectorySummarizer {
             sink.onAccessibility(childMetadata.isReadable)
 
             guard childMetadata.isDirectory else {
-                sink.onFile(childMetadata, childURL)
+                sink.onFile(childMetadata, childPath)
                 continue
             }
 
@@ -334,7 +334,7 @@ extension AtomicDirectorySummarizer {
 
             sink.onSubdirectory(
                 AtomicSummaryWorkItem(
-                    url: childURL,
+                    url: URL(filePath: childPath, directoryHint: .isDirectory),
                     treatPackagesAsDirectories: childMetadata.isPackage ? true : item.treatPackagesAsDirectories,
                     ownerNodeID: item.ownerNodeID
                 )
@@ -384,7 +384,7 @@ extension AtomicDirectorySummarizer {
 
         for childURL in childURLs {
             try cancellationCheck()
-            sink.onVisit(childURL)
+            sink.onVisit(childURL.path)
 
             let hintedIsDirectory = childURL.hasDirectoryPath
             guard !exclusionMatcher.excludes(childURL, isDirectory: hintedIsDirectory) else {
@@ -407,7 +407,7 @@ extension AtomicDirectorySummarizer {
             sink.onAccessibility(childMetadata.isReadable)
 
             guard childMetadata.isDirectory else {
-                sink.onFile(childMetadata, childURL)
+                sink.onFile(childMetadata, childURL.path)
                 continue
             }
 

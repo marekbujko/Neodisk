@@ -388,16 +388,16 @@ nonisolated final class AtomicDirectorySummaryPool: @unchecked Sendable {
                 var reportedFileCount = 0
                 var reportedBytes: Int64 = 0
                 let sink = AtomicSummaryLevelSink(
-                    onVisit: { url in
+                    onVisit: { path in
                         visitCount += 1
                         if visitCount == 1 || visitCount.isMultiple(of: 64) {
-                            self.heartbeat.emit(currentPath: url.path)
+                            self.heartbeat.emit(currentPath: path)
                         }
                     },
                     onAccessibility: { result.partial.updateAccessibility($0) },
                     onWarning: { result.partial.recordWarning(for: $0, error: $1) },
-                    onFile: { metadata, url in
-                        result.partial.accumulateFile(metadata, url: url, ownerNodeID: lease.item.ownerNodeID)
+                    onFile: { metadata, path in
+                        result.partial.accumulateFile(metadata, path: path, ownerNodeID: lease.item.ownerNodeID)
                         visitedFileCount += 1
                         if visitedFileCount.isMultiple(of: 64) {
                             let files = result.partial.descendantFileCount - reportedFileCount
@@ -406,7 +406,7 @@ nonisolated final class AtomicDirectorySummaryPool: @unchecked Sendable {
                                 jobID: lease.jobID,
                                 files: files,
                                 bytes: bytes,
-                                currentPath: url.path
+                                currentPath: path
                             )
                             reportedFileCount = result.partial.descendantFileCount
                             reportedBytes = result.partial.allocatedSize

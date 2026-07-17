@@ -334,7 +334,7 @@ public final class ScanEngine: Sendable {
                 isDirectoryLike: isDirectoryLike,
                 leafRecord: isDirectoryLike
                     ? nil
-                    : atomicDirectorySummarizer.makeFileNode(url: entry.url, metadata: metadata),
+                    : atomicDirectorySummarizer.makeFileNode(path: entry.path, name: entry.name, metadata: metadata),
                 isUnavailable: false
             )
         }

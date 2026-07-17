@@ -11,7 +11,11 @@ typealias CancellationCheck = @Sendable () throws -> Void
 /// Directory enumeration prefetches resource values, so carrying decoded metadata forward
 /// avoids asking each URL for the same values again when the child is scanned.
 nonisolated struct DirectoryEntry: Sendable {
-    let url: URL
+    /// The child's absolute path (its node id) and display name, materialized
+    /// once at enumeration and reused everywhere so nothing re-derives them
+    /// from a `URL`. `name` is the last path component.
+    let path: String
+    let name: String
     let metadata: NodeMetadata?
     let localizedEnumerationError: Error?
     let isDirectoryHint: Bool?
@@ -22,15 +26,27 @@ nonisolated struct DirectoryEntry: Sendable {
     /// ATTR_DIR_MOUNTSTATUS when bulk enumeration supplied it.
     let directoryMountStatus: UInt32
 
+    /// Rebuilt on demand from `path`: only directories, packages, and
+    /// unavailable entries ever need a `URL`; plain files go straight from
+    /// `path`/`name` to a `FileNodeRecord`, so building it eagerly per entry
+    /// was wasted `URL.appending`. `URL(filePath:)` is byte-equivalent to the
+    /// `parent.appending(path:)` it replaces for every property the scan reads.
+    var url: URL {
+        let isDirectory = metadata?.isDirectory ?? isDirectoryHint ?? false
+        return URL(filePath: path, directoryHint: isDirectory ? .isDirectory : .notDirectory)
+    }
+
     init(
-        url: URL,
+        path: String,
+        name: String,
         metadata: NodeMetadata?,
         localizedEnumerationError: Error? = nil,
         isDirectoryHint: Bool? = nil,
         deviceID: UInt64? = nil,
         directoryMountStatus: UInt32 = 0
     ) {
-        self.url = url
+        self.path = path
+        self.name = name
         self.metadata = metadata
         self.localizedEnumerationError = localizedEnumerationError
         self.isDirectoryHint = isDirectoryHint
@@ -91,7 +107,7 @@ nonisolated struct AtomicDirectorySummaryPartial: Sendable {
         warnings.append(ScanWarningFactory.makeWarning(for: url, error: error))
     }
 
-    mutating func accumulateFile(_ metadata: NodeMetadata, url: URL, ownerNodeID: String) {
+    mutating func accumulateFile(_ metadata: NodeMetadata, path: String, ownerNodeID: String) {
         allocatedSize = allocatedSize.addingClamped(metadata.allocatedSize)
         logicalSize = logicalSize.addingClamped(metadata.logicalSize)
         if metadata.isDataless {
@@ -100,7 +116,7 @@ nonisolated struct AtomicDirectorySummaryPartial: Sendable {
         if !metadata.isSymbolicLink {
             descendantFileCount += 1
         }
-        if let claim = HardLinkDeduplicator.claim(for: metadata, ownerNodeID: ownerNodeID, path: url.path) {
+        if let claim = HardLinkDeduplicator.claim(for: metadata, ownerNodeID: ownerNodeID, path: path) {
             hardLinkClaims.append(claim)
         }
     }
@@ -145,10 +161,13 @@ nonisolated struct AtomicDirectorySummaryPartial: Sendable {
 /// serves both the shared pool (folding into a partial) and the standalone
 /// `summarizeInParallel` path (folding into a locked accumulator + work queue).
 nonisolated struct AtomicSummaryLevelSink {
-    let onVisit: (URL) -> Void
+    /// `onVisit`/`onFile` take the child's path string (progress, hard-link
+    /// claim key) so the bulk walker builds no per-child `URL`; `onWarning`/
+    /// `onSubdirectory` keep `URL`s, built only for rare errors and recursion.
+    let onVisit: (String) -> Void
     let onAccessibility: (Bool) -> Void
     let onWarning: (URL, Error) -> Void
-    let onFile: (NodeMetadata, URL) -> Void
+    let onFile: (NodeMetadata, String) -> Void
     let onSubdirectory: (AtomicSummaryWorkItem) -> Void
 }
 

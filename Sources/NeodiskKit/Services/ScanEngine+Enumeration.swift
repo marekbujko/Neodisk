@@ -335,6 +335,10 @@ extension ScanEngine {
         // of rebuilding and re-standardizing a URL for every entry, and the URL
         // itself is only constructed for entries that survive filtering.
         let normalizedParentPath = url.standardizedFileURL.path
+        // Node-id base: child path is `childBasePath + "/" + name`, byte-identical
+        // to `url.appending(path: name).path` without the per-entry URL work.
+        // Uses `url.path` (not standardized) so ids match the compatibility path.
+        let childBasePath = url.path
         let enumeratedItemCount = try BulkDirectoryReader.readChildren(
             ofDirectory: url,
             using: context,
@@ -342,16 +346,17 @@ extension ScanEngine {
         ) { child in
             if !includeHiddenFiles && child.isHidden { return }
             guard includedChildName(child.name, underParentPath: normalizedParentPath, behavior: behavior) else { return }
+            let childPath = childBasePath == "/" ? "/" + child.name : childBasePath + "/" + child.name
 
             if let entryErrno = child.entryErrno {
-                let childURL = url.appending(path: child.name)
                 entries.append(DirectoryEntry(
-                    url: childURL,
+                    path: childPath,
+                    name: child.name,
                     metadata: nil,
                     localizedEnumerationError: NSError(
                         domain: NSPOSIXErrorDomain,
                         code: Int(entryErrno),
-                        userInfo: [NSURLErrorKey: childURL]
+                        userInfo: [NSURLErrorKey: URL(filePath: childPath)]
                     ),
                     deviceID: child.deviceID,
                     directoryMountStatus: child.directoryMountStatus
@@ -365,12 +370,18 @@ extension ScanEngine {
                 childName: child.name,
                 isDirectory: metadata.isDirectory
             ) else { return }
-            let childURL = url.appending(
-                path: child.name,
-                directoryHint: metadata.isDirectory ? .isDirectory : .notDirectory
+            // The concatenated node id must stay byte-identical to the URL's
+            // own path, or ids drift from the compatibility path and snapshots.
+            assert(
+                childPath == url.appending(
+                    path: child.name,
+                    directoryHint: metadata.isDirectory ? .isDirectory : .notDirectory
+                ).path,
+                "childPath \(childPath) diverged from appended URL path"
             )
             entries.append(DirectoryEntry(
-                url: childURL,
+                path: childPath,
+                name: child.name,
                 metadata: metadata,
                 deviceID: child.deviceID,
                 directoryMountStatus: child.directoryMountStatus
@@ -405,7 +416,8 @@ extension ScanEngine {
                 return nil
             }
             return DirectoryEntry(
-                url: failure.url,
+                path: failure.url.path,
+                name: failure.url.lastPathComponent,
                 metadata: nil,
                 localizedEnumerationError: failure.error,
                 isDirectoryHint: isDirectoryHint
@@ -509,7 +521,8 @@ extension ScanEngine {
             }
 
             entries.append((offset + localOffset, DirectoryEntry(
-                url: childURL,
+                path: childURL.path,
+                name: childURL.lastPathComponent,
                 metadata: childMetadata,
                 deviceID: childMetadata?.fileIdentity?.fileSystemDeviceID
             )))

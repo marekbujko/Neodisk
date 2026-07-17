@@ -179,10 +179,18 @@ nonisolated struct AtomicDirectorySummarizer: Sendable {
     // MARK: - Leaf construction
 
     func makeFileNode(url: URL, metadata: NodeMetadata) -> FileNodeRecord {
+        makeFileNode(path: url.path, name: ScanTarget.displayName(for: url), metadata: metadata)
+    }
+
+    /// Hot-path leaf builder for enumerated children: the directory worker
+    /// already holds the child's absolute path and name (from
+    /// `DirectoryEntry`), so it constructs the record straight from strings
+    /// without any per-file `url.path`/`lastPathComponent` derivation.
+    func makeFileNode(path: String, name: String, metadata: NodeMetadata) -> FileNodeRecord {
         FileNodeRecord(
-            id: url.path,
-            url: url,
-            name: ScanTarget.displayName(for: url),
+            id: path,
+            path: path,
+            name: name,
             isDirectory: metadata.isDirectory,
             isSymbolicLink: metadata.isSymbolicLink,
             allocatedSize: metadata.allocatedSize,
