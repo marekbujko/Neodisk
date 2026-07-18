@@ -3,8 +3,8 @@
 //  Neodisk
 //
 //  The composed sunburst chart: canvases under an interaction overlay,
-//  pinch-to-drill navigation (DaisyDisk style), the center "go up"
-//  affordance, and a delayed loading indicator. Ported from Radix; click
+//  pinch-to-drill navigation, the center "go up"
+//  affordance, and a delayed loading indicator. Click
 //  semantics (single-click drill) and model wiring live in SunburstPane.
 //
 
@@ -58,7 +58,7 @@ struct SunburstChartView: View {
     @ObservedObject var chartModel: SunburstChartModel
     @State private var isHoveringCenter = false
     @State private var showsLoadingDiskMapProgress = false
-    /// The in-flight drill zoom (DaisyDisk-style); nil outside transitions.
+    /// The in-flight drill zoom; nil outside transitions.
     /// Rendering derives from this plus the TimelineView frame date.
     @State private var zoomTransition: SunburstZoomTransitionState?
     /// Cursor position within the chart (top-left origin), or nil when off an
@@ -328,7 +328,7 @@ struct SunburstChartView: View {
 
     // MARK: - Zoom transition
 
-    /// Starts the DaisyDisk-style drill zoom when the layout identity moves
+    /// Starts the drill zoom when the layout identity moves
     /// to a different root within the same snapshot. Drilling in animates
     /// immediately on the outgoing layout; zooming out waits for the parent
     /// layout to land and plays the reverse. Everything else (rescans,
@@ -483,7 +483,7 @@ struct SunburstChartView: View {
         onClickSegment(hitTest(at: location, in: frame))
     }
 
-    /// Pinch-to-drill (DaisyDisk style): a spread over an arc opens that
+    /// Pinch-to-drill: a spread over an arc opens that
     /// folder, a squeeze anywhere goes up one level. The center hole is not
     /// a drill target — spreading there would re-open the current root.
     private func handlePinchDrill(

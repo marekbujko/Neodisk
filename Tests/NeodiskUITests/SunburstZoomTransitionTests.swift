@@ -2,7 +2,7 @@
 //  SunburstZoomTransitionTests.swift
 //  Neodisk
 //
-//  The DaisyDisk-style drill zoom: polar remapping of segments toward the
+//  The drill zoom: polar remapping of segments toward the
 //  focused arc (focus → center disk, descendants re-banded, outsiders
 //  collapsed) and the per-frame presentation state machine.
 //

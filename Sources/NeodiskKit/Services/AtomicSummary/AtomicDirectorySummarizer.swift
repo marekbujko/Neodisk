@@ -51,14 +51,40 @@ nonisolated struct AtomicDirectorySummarizer: Sendable {
         isKnownGeneratedDirectory: Bool,
         isNodeDependencyLayout: Bool
     ) -> Bool {
-        guard !childEntries.isEmpty else { return false }
-        if childEntries.count >= minFileCount { return true }
-        if isKnownGeneratedDirectory { return true }
-        return shouldRunDescendantAtomicProbe(
-            childEntries: childEntries,
+        isSummaryProbeWorthwhile(
+            directChildCount: childEntries.count,
+            hasDirectoryChild: childEntries.contains {
+                $0.metadata?.isDirectory ?? $0.url.hasDirectoryPath
+            },
             minFileCount: minFileCount,
+            isKnownGeneratedDirectory: isKnownGeneratedDirectory,
             isNodeDependencyLayout: isNodeDependencyLayout
         )
+    }
+
+    /// The candidate gate above expressed over just the direct-child counts the
+    /// decision reads — no `DirectoryEntry` array. The incremental relist calls
+    /// this with a directory's freshly-read direct children: if a membership
+    /// change makes a directory newly eligible for a summary probe (or no longer
+    /// eligible), the relist re-walks it so the summarize/expand decision matches
+    /// a full scan exactly, instead of splicing a directory the traversal would
+    /// have collapsed. Fires only for directories dense enough to summarize, so
+    /// the re-walk is a rare, bounded fallback.
+    nonisolated func isSummaryProbeWorthwhile(
+        directChildCount: Int,
+        hasDirectoryChild: Bool,
+        minFileCount: Int,
+        isKnownGeneratedDirectory: Bool,
+        isNodeDependencyLayout: Bool
+    ) -> Bool {
+        guard directChildCount > 0 else { return false }
+        if directChildCount >= minFileCount { return true }
+        if isKnownGeneratedDirectory { return true }
+        if isNodeDependencyLayout { return true }
+        // Sparse parents traverse cheaply; only dense ones warrant a probe.
+        guard hasDirectoryChild else { return false }
+        let minimumImmediateEntries = max(1, min(minFileCount, minFileCount / 10))
+        return directChildCount >= minimumImmediateEntries
     }
 
     /// Determines if a directory should be treated as atomic (summarized without expansion).

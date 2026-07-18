@@ -52,7 +52,7 @@ let package = Package(
     targets: [
         // UI-free scanning core: models + services. Foundation/Darwin/
         // Dispatch (+ CryptoKit, UniformTypeIdentifiers) only — no AppKit,
-        // no SwiftUI. Derived from Radix (MIT, attributed in LICENSE).
+        // no SwiftUI. Includes third-party code (MIT), attributed in LICENSE.
         .target(
             name: "NeodiskKit",
             path: "Sources/NeodiskKit"

@@ -2,7 +2,7 @@
 //  SunburstLegend.swift
 //  Neodisk
 //
-//  Pure derivation of the DaisyDisk-style legend list next to the sunburst:
+//  Pure derivation of the legend list next to the sunburst:
 //  one row per child of the displayed folder, colored exactly like that
 //  child's chart segment. Rows derive from the chart's rendered segments so
 //  the list and the chart always agree — same aggregate pooling, same

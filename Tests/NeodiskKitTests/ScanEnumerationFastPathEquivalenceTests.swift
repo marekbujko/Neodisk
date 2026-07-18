@@ -122,6 +122,64 @@ import Testing
         }
     }
 
+    /// The enumeration hot path builds each child's node id by string
+    /// concatenation — `childBasePath + "/" + name` (or `"/" + name` at the
+    /// volume root) — and relies on it staying byte-identical to
+    /// `url.appending(path: name).path`, the form the compatibility path and
+    /// snapshot ids use. In production a debug `assert` guards that equality, but
+    /// `-O` release builds (what ships and what benchmarks run) strip it, so the
+    /// only place the invariant is checked in release is here. The subtle case is
+    /// unicode normalization: `URL.appending(path:)` could in principle normalize
+    /// an NFD-decomposed name (an `e` + combining accent) while concatenation
+    /// preserves the raw bytes — which would silently drift the fast-path id from
+    /// the compatibility/snapshot id. This asserts they agree across NFD/NFC,
+    /// emoji, percent, trailing-dot and leading-dot names, at ordinary parents
+    /// and at the volume root.
+    @Test func nodeIDConcatenationMatchesAppendedURLPathAcrossExoticNames() {
+        // Mirrors ScanEngine+Enumeration's `childPath` expression exactly.
+        func concatenatedID(base childBasePath: String, name: String) -> String {
+            childBasePath == "/" ? "/" + name : childBasePath + "/" + name
+        }
+
+        let exoticNames = [
+            "caf\u{00E9}",              // NFC precomposed é
+            "cafe\u{0301}",             // NFD: e + combining acute
+            "re\u{0301}se\u{0301}au.log", // NFD, multiple combining marks
+            "\u{1F600}emoji",           // emoji (astral plane)
+            "weird%20name",             // literal percent sequence
+            "trailing.",                // trailing dot
+            "..weird",                  // leading dots (not . or ..)
+            ".hidden",                  // leading dot
+            "a b",                      // space
+            "Ñandú",                    // NFC with tilde
+            "\u{4E2D}\u{6587}",         // CJK
+            "plain"
+        ]
+        let bases = [
+            "/", "/Users", "/Users/alice", "/Volumes/Ext",
+            "/Users/alice/Library/CloudStorage"
+        ]
+
+        for base in bases {
+            let baseURL = URL(filePath: base, directoryHint: .isDirectory)
+            for name in exoticNames {
+                for isDirectory in [false, true] {
+                    let appended = baseURL.appending(
+                        path: name,
+                        directoryHint: isDirectory ? .isDirectory : .notDirectory
+                    ).path
+                    let scalars = name.unicodeScalars
+                        .map { String(format: "U+%04X", $0.value) }
+                        .joined(separator: " ")
+                    #expect(
+                        concatenatedID(base: base, name: name) == appended,
+                        "node-id concat diverged from appended URL path: base=\(base) name-scalars=\(scalars) dir=\(isDirectory)"
+                    )
+                }
+            }
+        }
+    }
+
     /// The scan root itself and the concrete cloud-location roots are boundary
     /// cases in the cloud rules; assert the fast path agrees there too.
     @Test func fastPathMatchesForRootAndCloudBoundaries() {

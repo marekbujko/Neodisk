@@ -2,7 +2,7 @@
 //  SunburstLegendList.swift
 //  Neodisk
 //
-//  The DaisyDisk-style legend beside the sunburst chart: a header for the
+//  The legend beside the sunburst chart: a header for the
 //  displayed folder and one row per child, colored exactly like the chart's
 //  segments (rows derive from the rendered layout via SunburstLegend).
 //  Hovering a row highlights its arc in the chart and feeds the status bar;

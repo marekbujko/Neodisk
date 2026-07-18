@@ -295,13 +295,21 @@ public struct ScanSnapshot: Identifiable, Sendable {
     nonisolated static func mergedWarningsPruningReplacedSubtrees(
         existing: [ScanWarning],
         replacedRootPaths: [String],
+        prunedExactPaths: [String] = [],
         additional: [ScanWarning]
     ) -> [ScanWarning] {
         var seen = Set<String>()
         var result: [ScanWarning] = []
+        // Directories re-read whole (deep re-walk / removal / file replacement)
+        // prune every warning beneath them; a shallow relist only re-verified
+        // the directory itself, so it prunes the warning at exactly that path.
+        let exactPaths = Set(prunedExactPaths)
 
         for warning in existing {
             if replacedRootPaths.contains(where: { path(warning.path, isContainedIn: $0) }) {
+                continue
+            }
+            if exactPaths.contains(warning.path) {
                 continue
             }
             if seen.insert(warning.id).inserted {

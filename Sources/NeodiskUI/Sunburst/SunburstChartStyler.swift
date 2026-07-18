@@ -3,7 +3,7 @@
 //  Neodisk
 //
 //  Fill/stroke styles for sunburst segments: depth-faded fills, hover and
-//  selection overlays. Ported from Radix; fills resolved at layout time
+//  selection overlays. Fills resolved at layout time
 //  (kind/age modes) take precedence over the branch color resolver.
 //
 

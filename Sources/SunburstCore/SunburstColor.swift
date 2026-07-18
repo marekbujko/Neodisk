@@ -2,7 +2,7 @@
 //  SunburstColor.swift
 //  SunburstCore
 //
-//  Branch-hue coloring for the sunburst's Largest tab, ported from Radix:
+//  Branch-hue coloring for the sunburst's Largest tab:
 //  each scan-root branch gets a stable hue (FNV-1a of the branch id), siblings
 //  vary around it, and depth darkens/desaturates. Pure — HSB/RGB math and FNV
 //  hashing only, no SwiftUI Color (that stays in NeodiskUI).
@@ -13,9 +13,8 @@
 
 public enum SunburstColorRole: Hashable, Sendable {
     case normal
-    /// A file (or file-like leaf). Branch mode draws these gray, DaisyDisk
-    /// style: files are leaves, and graying them keeps the colored folder
-    /// wedges legible.
+    /// A file (or file-like leaf). Branch mode draws these gray: files are
+    /// leaves, and graying them keeps the colored folder wedges legible.
     case file
     case aggregate
     case freeSpace

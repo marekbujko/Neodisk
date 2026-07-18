@@ -4,10 +4,9 @@
 //
 //  AppKit event layer over the sunburst: tracking-area hover, click vs drag
 //  disambiguation (3 pt threshold), pinch-to-drill (spread over an arc opens
-//  that folder, squeeze goes up one level — DaisyDisk style), tooltips, and
-//  the right-click context menu. Ported from Radix minus its drag-to-discard
-//  support (Neodisk is read-only) and viewport zoom/pan (drilling replaced
-//  it).
+//  that folder, squeeze goes up one level), tooltips, and
+//  the right-click context menu. No drag-to-discard support (Neodisk is
+//  read-only) and no viewport zoom/pan (drilling replaced it).
 //
 
 import AppKit

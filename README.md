@@ -76,7 +76,7 @@ One package, strictly layered targets:
 
 ```
 Sources/
-├── NeodiskKit/   # UI-free scanning core (derived from Radix)
+├── NeodiskKit/   # UI-free scanning core
 ├── NeodiskCLI/   # `diskscan`, the core's reference CLI
 ├── TreemapKit/   # Pure treemap geometry, viewport, rasterizer
 ├── NeodiskUI/    # SwiftUI/AppKit views, view model, scan lifecycle
@@ -92,18 +92,13 @@ Localization/     # .lproj string catalogs, one per language
 
 ## Credits
 
-- [Radix](https://github.com/colinvkim/Radix) by Colin Kim (MIT), the scan
-  engine and core data model NeodiskKit is derived from, and the sunburst
-  visualization is ported from. Huge inspiration.
 - [Disk Inventory X](http://www.derlien.com/) by Tjark Derlien and
   [GrandPerspective](https://grandperspectiv.sourceforge.net/) by Erwin
   Bonsma, the cushion-treemap disk viewers this UI follows. No code from
   either is used.
-- [DaisyDisk](https://daisydiskapp.com/) by Software Ambience, the
-  sunburst-with-folder-legend layout that view follows. No code is used.
 - Cushion treemaps: van Wijk & van de Wetering, INFOVIS 1999. Squarified
   treemaps: Bruls, Huizing & van Wijk, 2000.
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE), Radix attribution is preserved there.
+GPL-3.0-or-later. See [LICENSE](LICENSE), which preserves upstream attribution.

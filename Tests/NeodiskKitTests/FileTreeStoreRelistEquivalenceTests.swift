@@ -221,7 +221,7 @@ import Testing
                 replacements: replacements,
                 removingSubtreeIDs: removals,
                 insertions: insertions.map { FileTreeStore.SubtreeInsertion(parentID: rootID, store: $0) },
-                rootRecordOverride: rootOverride,
+                recordOverrides: rootOverride.map { [rootID: $0] } ?? [:],
                 cancellationCheck: {}
             )
             guard case .spliced(let numeric) = numericOutcome else {
@@ -256,7 +256,7 @@ import Testing
 
         guard case .spliced(let numeric) = try baseline.numericApplyEdits(
             replacements: [], removingSubtreeIDs: [child], insertions: [],
-            rootRecordOverride: nil, cancellationCheck: {}
+            recordOverrides: [:], cancellationCheck: {}
         ) else { Issue.record("declined pure removal"); return }
         let legacy = try #require(try baseline.legacyApplyingRootRelist(
             refreshedRootRecord: nil, removingChildren: [child],
@@ -274,7 +274,7 @@ import Testing
         guard case .spliced(let numeric) = try baseline.numericApplyEdits(
             replacements: [], removingSubtreeIDs: [],
             insertions: [FileTreeStore.SubtreeInsertion(parentID: baseline.rootID, store: insertion)],
-            rootRecordOverride: nil, cancellationCheck: {}
+            recordOverrides: [:], cancellationCheck: {}
         ) else { Issue.record("declined pure insertion"); return }
         let legacy = try #require(try baseline.legacyApplyingRootRelist(
             refreshedRootRecord: nil, removingChildren: [],
@@ -303,7 +303,7 @@ import Testing
             guard case .spliced(let nextNumeric) = try numericStore.numericApplyEdits(
                 replacements: replacements, removingSubtreeIDs: removals,
                 insertions: [FileTreeStore.SubtreeInsertion(parentID: rootID, store: insertion)],
-                rootRecordOverride: nil, cancellationCheck: {}
+                recordOverrides: [:], cancellationCheck: {}
             ) else { Issue.record("gen \(gen): declined"); return }
             numericStore = nextNumeric
             legacyStore = try #require(try legacyStore.legacyApplyingRootRelist(
@@ -324,7 +324,7 @@ import Testing
                     parentID: baseline.rootID,
                     store: builder.store(rootPath: "/root/x", depth: 1)
                 )],
-                rootRecordOverride: nil,
+                recordOverrides: [:],
                 cancellationCheck: { throw CancellationError() }
             )
         }

@@ -3,7 +3,7 @@
 //  Neodisk
 //
 //  The tapered ring radii: the single source of truth for how deep the
-//  sunburst's rings sit. DaisyDisk-style — deeper rings are thinner bands,
+//  sunburst's rings sit. Deeper rings are thinner bands,
 //  floored so they stay clickable, normalized to fill the same outer radius
 //  no matter the ring count.
 //

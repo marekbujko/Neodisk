@@ -287,13 +287,20 @@ public final class ScanEngine: Sendable {
     struct ShallowChild: Sendable {
         let url: URL
         /// A traversable directory or a package/summarized directory — anything
-        /// the tree represents with a directory node. Symlinks are leaves.
+        /// the tree represents with a directory node. Symlinks and unreadable
+        /// children are leaves (an unreadable child is a childless inaccessible
+        /// node, exactly what a full scan collapses it to).
         let isDirectoryLike: Bool
-        /// The leaf record for a non-directory child (file/symlink), else nil.
+        /// The node this child splices in: the leaf record for a file/symlink,
+        /// or the inaccessible node for a permission-denied / unclassifiable
+        /// child. Nil only for a directory-like child (left to its own relist).
         let leafRecord: FileNodeRecord?
-        /// The child could not be classified (enumeration error or missing
-        /// metadata); the relist escalates to a full scan rather than guess.
+        /// The child could not be read (enumeration error or missing metadata).
+        /// It still carries an inaccessible `leafRecord` and `warning` so the
+        /// relist reproduces a full scan inline instead of re-walking.
         let isUnavailable: Bool
+        /// The warning a full scan emits for an unreadable child, else nil.
+        let warning: ScanWarning?
     }
 
     /// Lists a directory's direct children with the exact inclusion gates a
@@ -321,29 +328,122 @@ public final class ScanEngine: Sendable {
         )
         return contents.entries.map { entry in
             guard entry.localizedEnumerationError == nil, let metadata = entry.metadata else {
-                return ShallowChild(
-                    url: entry.url,
-                    isDirectoryLike: false,
-                    leafRecord: nil,
-                    isUnavailable: true
-                )
+                if let enumError = entry.localizedEnumerationError {
+                    return unavailableChild(entry: entry, error: enumError)
+                }
+                // Missing metadata, no explicit error: mirror the traversal and
+                // retry once (it may be a transient bulk-enumeration gap). On
+                // success it's a normal child; on failure, unavailable with the
+                // retry's real error for the warning.
+                do {
+                    return availableChild(entry: entry, metadata: try metadataLoader.metadata(for: entry.url))
+                } catch {
+                    return unavailableChild(entry: entry, error: error)
+                }
             }
-            let isDirectoryLike = metadata.isDirectory && !metadata.isSymbolicLink
-            return ShallowChild(
-                url: entry.url,
-                isDirectoryLike: isDirectoryLike,
-                leafRecord: isDirectoryLike
-                    ? nil
-                    : atomicDirectorySummarizer.makeFileNode(path: entry.path, name: entry.name, metadata: metadata),
-                isUnavailable: false
-            )
+            return availableChild(entry: entry, metadata: metadata)
         }
+    }
+
+    private nonisolated func availableChild(
+        entry: DirectoryEntry, metadata: NodeMetadata
+    ) -> ShallowChild {
+        let isDirectoryLike = metadata.isDirectory && !metadata.isSymbolicLink
+        return ShallowChild(
+            url: entry.url,
+            isDirectoryLike: isDirectoryLike,
+            leafRecord: isDirectoryLike
+                ? nil
+                : atomicDirectorySummarizer.makeFileNode(path: entry.path, name: entry.name, metadata: metadata),
+            isUnavailable: false,
+            warning: nil
+        )
+    }
+
+    /// The inaccessible node + warning a full scan produces for an unreadable
+    /// child — a childless node marked inaccessible, so a relist splices it
+    /// inline (no subtree walk) and matches a fresh scan of the same state.
+    private nonisolated func unavailableChild(
+        entry: DirectoryEntry, error: Error
+    ) -> ShallowChild {
+        let isDirectory: Bool
+        if let metadata = entry.metadata {
+            isDirectory = metadata.isDirectory && !metadata.isSymbolicLink
+        } else {
+            isDirectory = entry.isDirectoryHint ?? entry.url.hasDirectoryPath
+        }
+        return ShallowChild(
+            url: entry.url,
+            isDirectoryLike: false,
+            leafRecord: inaccessibleNodeForUnavailableChild(path: entry.path, isDirectoryHint: isDirectory),
+            isUnavailable: true,
+            warning: ScanWarningFactory.makeWarning(for: entry.url, error: error)
+        )
+    }
+
+    /// The childless inaccessible node a full scan produces for an unreadable
+    /// child (size 0, both accessibility flags false), so a relist can splice it
+    /// inline. Matches `ScanTraversal.makeUnavailableNode`.
+    nonisolated func inaccessibleNodeForUnavailableChild(
+        path: String, isDirectoryHint: Bool
+    ) -> FileNodeRecord {
+        let url = URL(filePath: path, directoryHint: isDirectoryHint ? .isDirectory : .notDirectory)
+        return FileNodeRecord(
+            id: path,
+            url: url,
+            name: ScanTarget.displayName(for: url),
+            isDirectory: isDirectoryHint,
+            isSymbolicLink: false,
+            allocatedSize: 0,
+            logicalSize: 0,
+            descendantFileCount: 0,
+            lastModified: nil,
+            isPackage: false,
+            isAccessible: false,
+            isSelfAccessible: false,
+            isSynthetic: false,
+            isAutoSummarized: false
+        )
     }
 
     /// The root directory's own refreshed record (mtime etc.) for a relist,
     /// or nil when the load fails. Reads only the root itself.
     nonisolated func rootDirectoryMetadata(of url: URL) -> NodeMetadata? {
         try? metadataLoader.metadata(for: url, captureDirectoryIdentity: true)
+    }
+
+    /// Whether a relisted directory, given its freshly-read direct children,
+    /// would be a candidate for auto-summarization — the exact gate the
+    /// traversal applies before probing (`ScanTraversal`'s `canProbeForAutoSummary`
+    /// plus `isSummaryProbeWorthwhile`). The incremental relist re-walks a
+    /// directory whose membership change trips this so its summarize/expand
+    /// outcome matches a full scan, instead of splicing children into a
+    /// directory the traversal would have collapsed.
+    nonisolated func isRelistSummaryCandidate(
+        directoryURL: URL,
+        depth: Int,
+        directChildCount: Int,
+        hasDirectoryChild: Bool,
+        options: ScanOptions
+    ) -> Bool {
+        guard options.autoSummarizeDirectories else { return false }
+        let minDepth = options.tuning.autoSummarizeMinDepthForSummarization
+            ?? ScanTraversal.AtomicDirectoryThresholds.minDepthForSummarization
+        let minFileCount = options.tuning.autoSummarizeMinFileCount
+            ?? ScanTraversal.AtomicDirectoryThresholds.minFileCount
+        let isNodeDependencyLayout = AtomicDirectorySummarizer.isNodeDependencyLayoutDirectory(at: directoryURL)
+        let isKnownGeneratedDirectory = AtomicDirectorySummarizer.isKnownGeneratedDirectory(at: directoryURL)
+        let canProbe = depth >= minDepth
+            || (depth >= 1 && isNodeDependencyLayout)
+            || isKnownGeneratedDirectory
+        guard canProbe else { return false }
+        return atomicDirectorySummarizer.isSummaryProbeWorthwhile(
+            directChildCount: directChildCount,
+            hasDirectoryChild: hasDirectoryChild,
+            minFileCount: minFileCount,
+            isKnownGeneratedDirectory: isKnownGeneratedDirectory,
+            isNodeDependencyLayout: isNodeDependencyLayout
+        )
     }
 
     private nonisolated func scan(

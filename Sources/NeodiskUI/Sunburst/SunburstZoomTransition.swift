@@ -2,7 +2,7 @@
 //  SunburstZoomTransition.swift
 //  Neodisk
 //
-//  DaisyDisk-style drill transition for the sunburst: the clicked segment's
+//  Drill transition for the sunburst: the clicked segment's
 //  arc sweeps open to the full circle while its band morphs into the center
 //  disk, its descendants shift up one ring per level, and everything outside
 //  the arc collapses to zero width; zooming out plays the exact reverse on

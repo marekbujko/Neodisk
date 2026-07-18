@@ -2,7 +2,7 @@
 //  SunburstChartModelTests.swift
 //  Neodisk
 //
-//  Ported from Radix: generation-guarded layout loads (stale results
+//  Generation-guarded layout loads (stale results
 //  dropped, older work cancelled), hover clearing, and selection overlay
 //  ordering.
 //

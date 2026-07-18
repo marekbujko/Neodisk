@@ -21,8 +21,8 @@ struct DarwinFileSystemEventHistoryProvider: FileSystemEventHistoryProviding {
     /// This bounds the time a user waits on a failed incremental gamble, so
     /// it must stay a small fraction of a full scan: replay drains at roughly
     /// 50k delivered events/s, so 3s covers ~150k events — weeks of typical
-    /// churn even for a whole-volume window — while a stalled fseventsd (the
-    /// latent hang Radix's collector could suffer) costs 3s, not 15.
+    /// churn even for a whole-volume window — while a stalled fseventsd (a
+    /// latent hang this timeout contains) costs 3s, not 15.
     private let replayTimeout: DispatchTimeInterval
     /// Cap on distinct in-window changed paths retained before bailing to a
     /// full scan — a memory bound, since repeated events on the same path

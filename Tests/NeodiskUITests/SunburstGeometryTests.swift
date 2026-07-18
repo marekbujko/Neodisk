@@ -2,7 +2,7 @@
 //  SunburstGeometryTests.swift
 //  Neodisk
 //
-//  Ported from Radix's sunburst geometry suite, plus Neodisk-specific
+//  Sunburst geometry suite, plus Neodisk-specific
 //  coverage for the free-space segment and layout-time kind/age coloring.
 //
 

@@ -3,8 +3,8 @@
 //  Neodisk
 //
 //  Off-main sunburst layout with stale-result protection, plus the rendered
-//  segment state (hover, hit-test index, selection overlay cache). Ported
-//  from Radix; layout requests carry Neodisk's color style and free space.
+//  segment state (hover, hit-test index, selection overlay cache). Layout
+//  requests carry Neodisk's color style and free space.
 //
 
 import SunburstCore

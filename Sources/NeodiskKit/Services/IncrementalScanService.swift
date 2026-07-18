@@ -227,23 +227,10 @@ public final class IncrementalScanService: Sendable {
                 incrementalCheckpoint: through
             )))
 
-        case .rescanSubtrees(let rootIDs):
-            try await rescanAndSplice(
-                rootIDs: rootIDs,
-                target: target,
-                options: options,
-                behavior: behavior,
-                exclusionMatcher: exclusionMatcher,
-                baseline: baseline,
-                cutoff: through,
-                startedAt: startedAt,
-                continuation: continuation,
-                floor: floor
-            )
-
-        case .relistRoot(let subtreeRootIDs):
-            try await relistRootAndSplice(
-                subtreeRootIDs: subtreeRootIDs,
+        case .relistDirectories(let dirIDs, let deepRescanRootIDs):
+            try await relistDirectoriesAndSplice(
+                dirIDs: dirIDs,
+                deepRescanRootIDs: deepRescanRootIDs,
                 target: target,
                 options: options,
                 behavior: behavior,
@@ -257,8 +244,15 @@ public final class IncrementalScanService: Sendable {
         }
     }
 
-    private nonisolated func rescanAndSplice(
-        rootIDs: [String],
+    /// The core of the incremental rescan: shallow-relist each directory the
+    /// journal named (one readdir + diff against the baseline's direct
+    /// children), deep re-walk only the subtrees FSEvents semantics force, and
+    /// splice every edit in a single pass. Scattered churn across N directories
+    /// costs N directory reads instead of a recursive re-walk of the coalesced
+    /// high-mass ancestors that dominated the old subtree rescan.
+    private nonisolated func relistDirectoriesAndSplice(
+        dirIDs: [String],
+        deepRescanRootIDs: [String],
         target: ScanTarget,
         options: ScanOptions,
         behavior: ScanEngine.ScanBehavior,
@@ -269,97 +263,168 @@ public final class IncrementalScanService: Sendable {
         continuation: AsyncThrowingStream<ScanProgressEvent, Error>.Continuation,
         floor: RescanProgressFloor
     ) async throws {
-        // A plain subtree rescan is a relist with no membership edits and no
-        // root-record refresh: every mapped root is an existing subtree the
-        // splice replaces in place.
-        var edits = RootRelistEdits()
-        for rootID in rootIDs {
-            guard baseline.treeStore.node(id: rootID) != nil else {
+        let store = baseline.treeStore
+
+        // Phase 1 — read each named directory once, concurrently. The live
+        // filesystem decides membership; events only pointed us here.
+        //
+        // A named directory that no longer exists (or is no longer a directory)
+        // is NOT simply dropped: the FSEvents stream that lost its own delete
+        // event may have lost sibling events too, so instead of trusting "the
+        // parent was surely named", we PROMOTE its parent into the relist set
+        // and re-read it. The parent's diff then removes the vanished child and
+        // re-checks every other child a dropped event might have changed.
+        // Promotion recurses up a cascaded deletion, bounded by the scan root;
+        // if the scan root itself vanished, only a full scan is trustworthy. Any
+        // other enumeration failure, or a child that cannot be classified, is
+        // ambiguous to diff, so the whole rescan escalates to a full scan.
+        struct DirRelist: Sendable {
+            let dirID: String
+            let node: FileNodeRecord
+            let liveChildren: [ScanEngine.ShallowChild]
+            let ownMetadata: NodeMetadata?
+        }
+        enum RelistOutcome: Sendable {
+            case relisted(DirRelist)
+            /// Gone (or no longer a directory): re-read this parent id next round.
+            case promoteParent(String)
+            /// Not present in the baseline tree, or a vanished scan root — skip
+            /// (root handled by the caller's escalation).
+            case skip
+            /// The scan root itself vanished — only a full scan is trustworthy.
+            case rootVanished
+            /// The directory could not be shallow-relisted — its own readdir
+            /// failed, or a child could not be classified (permission-denied,
+            /// missing metadata). A deep re-walk of just this directory
+            /// reproduces exactly what a full scan does there (inaccessible node
+            /// + warning, and cheap when the directory itself is unreadable),
+            /// instead of aborting the entire rescan to a full scan. This is the
+            /// tolerance a whole-volume scan without Full Disk Access needs:
+            /// ambient churn constantly names directories with unreadable
+            /// children, and bailing on every one of them degraded every rescan
+            /// to a full traversal.
+            case deepRewalk(String)
+        }
+        let scanEngineRef = self.engine
+        let rootID = store.rootID
+        var relists: [DirRelist] = []
+        var forcedDeepRewalkIDs: [String] = []
+        var pending = dirIDs
+        var visited = Set(dirIDs)
+        // Bounded by tree depth (each round strictly climbs toward the root).
+        while !pending.isEmpty {
+            let round = pending
+            pending = []
+            let outcomes: [RelistOutcome]
+            do {
+                outcomes = try await BoundedAsyncMap.run(
+                    round,
+                    limit: ScanConcurrencyPolicy.incrementalSubtreeWorkerLimit()
+                ) { dirID -> RelistOutcome in
+                    guard let node = store.node(id: dirID) else { return .skip }
+                    let ownMetadata = scanEngineRef.rootDirectoryMetadata(of: node.url)
+                    guard let ownMetadata, ownMetadata.isDirectory, !ownMetadata.isSymbolicLink else {
+                        guard let parentID = store.parent(of: dirID)?.id, parentID != dirID else {
+                            return .rootVanished
+                        }
+                        return .promoteParent(parentID)
+                    }
+                    do {
+                        let liveChildren = try await scanEngineRef.directChildren(
+                            of: node.url,
+                            options: options,
+                            behavior: behavior,
+                            exclusionMatcher: exclusionMatcher
+                        )
+                        return .relisted(DirRelist(
+                            dirID: dirID,
+                            node: node,
+                            liveChildren: liveChildren,
+                            ownMetadata: ownMetadata
+                        ))
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        return .deepRewalk(dirID)
+                    }
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
                 return try await forwardFullScan(
-                    target: target,
-                    options: options,
-                    reason: .subtreeVanished,
-                    continuation: continuation,
-                    floor: floor
+                    target: target, options: options,
+                    reason: .rootRelistEnumerationFailed,
+                    continuation: continuation, floor: floor
                 )
             }
-            edits.subtreeScans.append(SubtreeScanRequest(role: .replace(baselineID: rootID), baselineID: rootID))
-        }
-        try await applyRelistEdits(
-            edits,
-            replacedRootPaths: rootIDs,
-            isRootRelist: false,
-            target: target,
-            options: options,
-            behavior: behavior,
-            baseline: baseline,
-            cutoff: cutoff,
-            startedAt: startedAt,
-            continuation: continuation,
-            floor: floor
-        )
-    }
-
-    /// The scan-root membership relist (see `IncrementalRescanPlan.relistRoot`):
-    /// one shallow readdir of the root, diffed against the baseline's direct
-    /// children, turned into removals / insertions / file-record replacements
-    /// that splice together with the deep `subtreeRootIDs` in a single pass.
-    private nonisolated func relistRootAndSplice(
-        subtreeRootIDs: [String],
-        target: ScanTarget,
-        options: ScanOptions,
-        behavior: ScanEngine.ScanBehavior,
-        exclusionMatcher: ScanExclusionMatcher,
-        baseline: ScanSnapshot,
-        cutoff: FSEventsCheckpoint,
-        startedAt: Date,
-        continuation: AsyncThrowingStream<ScanProgressEvent, Error>.Continuation,
-        floor: RescanProgressFloor
-    ) async throws {
-        let rootID = baseline.treeStore.rootID
-
-        // One readdir of the root — the real filesystem decides, events only
-        // pointed us here. Any enumeration failure escalates to a full scan.
-        let liveChildren: [ScanEngine.ShallowChild]
-        do {
-            liveChildren = try await engine.directChildren(
-                of: target.url,
-                options: options,
-                behavior: behavior,
-                exclusionMatcher: exclusionMatcher
-            )
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            return try await forwardFullScan(
-                target: target, options: options,
-                reason: .rootRelistEnumerationFailed,
-                continuation: continuation, floor: floor
-            )
-        }
-        // A child we cannot classify (permission-denied direct child, missing
-        // metadata) is rare at the root and ambiguous to diff; a full scan
-        // reproduces it exactly, so escalate rather than guess.
-        if liveChildren.contains(where: \.isUnavailable) {
-            return try await forwardFullScan(
-                target: target, options: options,
-                reason: .rootRelistEnumerationFailed,
-                continuation: continuation, floor: floor
-            )
+            for outcome in outcomes {
+                switch outcome {
+                case .relisted(let relist):
+                    relists.append(relist)
+                case .promoteParent(let parentID):
+                    if visited.insert(parentID).inserted { pending.append(parentID) }
+                case .deepRewalk(let dirID):
+                    // Re-walking the root subtree IS a full scan; take it directly.
+                    guard dirID != rootID else {
+                        return try await forwardFullScan(
+                            target: target, options: options,
+                            reason: .rootRelistEnumerationFailed,
+                            continuation: continuation, floor: floor
+                        )
+                    }
+                    forcedDeepRewalkIDs.append(dirID)
+                case .skip:
+                    continue
+                case .rootVanished:
+                    return try await forwardFullScan(
+                        target: target, options: options,
+                        reason: .rootRelistEnumerationFailed,
+                        continuation: continuation, floor: floor
+                    )
+                }
+            }
         }
 
-        let baselineChildren = baseline.treeStore.children(of: rootID)
-        var baselineChildByID = [String: FileNodeRecord](minimumCapacity: baselineChildren.count)
-        for child in baselineChildren { baselineChildByID[child.id] = child }
-        var liveChildByID = [String: ScanEngine.ShallowChild](minimumCapacity: liveChildren.count)
-        for child in liveChildren { liveChildByID[child.url.path] = child }
+        var edits = DirectoryRelistEdits()
 
-        var edits = RootRelistEdits()
+        // Phase 2a — classify each successfully-relisted directory. A membership
+        // change can flip whether a full scan would auto-summarize the directory
+        // (crossing the file-count threshold, or dropping below it): such a
+        // directory must be deep re-walked so the summarize/expand decision is
+        // reproduced exactly, not shallow-spliced. Everything else is a shallow
+        // relist.
+        struct ShallowRelist { let relist: DirRelist }
+        var shallowRelists: [ShallowRelist] = []
+        var runtimeDeepRootIDs: [String] = []
+        for relist in relists {
+            let depth = store.path(to: relist.dirID).count - 1
+            let isSummaryCandidate = self.engine.isRelistSummaryCandidate(
+                directoryURL: relist.node.url,
+                depth: depth,
+                directChildCount: relist.liveChildren.count,
+                hasDirectoryChild: relist.liveChildren.contains(where: \.isDirectoryLike),
+                options: options
+            )
+            let wasSummarized = store.node(id: relist.dirID)?.isAutoSummarized ?? false
+            if isSummaryCandidate || wasSummarized {
+                runtimeDeepRootIDs.append(relist.dirID)
+            } else {
+                shallowRelists.append(ShallowRelist(relist: relist))
+            }
+        }
 
-        // Deep subtree changes the same window mapped, minus any that fall under
-        // a child the relist is about to remove.
-        for id in subtreeRootIDs {
-            guard baseline.treeStore.node(id: id) != nil else {
+        // Phase 2b — the deep re-walk set: what FSEvents forced, the directories
+        // the relist found summary-eligible, and the directories a shallow relist
+        // couldn't read (permission/enumeration) — all collapsed to disjoint
+        // roots. Shallow relists at or under a deep root are redundant (the
+        // re-walk rebuilds them) and are dropped.
+        var deepRootIDs = deepRescanRootIDs
+        deepRootIDs.append(contentsOf: runtimeDeepRootIDs)
+        deepRootIDs.append(contentsOf: forcedDeepRewalkIDs)
+        let collapsedDeepRootIDs = store.topLevelNodeIDs(from: deepRootIDs)
+        let deepRootSet = Set(collapsedDeepRootIDs)
+        for id in collapsedDeepRootIDs {
+            guard store.node(id: id) != nil else {
                 return try await forwardFullScan(
                     target: target, options: options,
                     reason: .subtreeVanished,
@@ -368,63 +433,133 @@ public final class IncrementalScanService: Sendable {
             }
             edits.subtreeScans.append(SubtreeScanRequest(role: .replace(baselineID: id), baselineID: id))
         }
+        // A directory that vanished under a deep root is already accounted for by
+        // that root's re-walk; drop the standalone removal so it can't overlap
+        // the replace.
+        if !deepRootSet.isEmpty {
+            edits.removals.removeAll { store.isNodeOrDescendant($0, of: deepRootSet) }
+        }
 
-        // Diff direct children.
-        for (id, baselineChild) in baselineChildByID {
-            guard let live = liveChildByID[id] else {
-                // Child vanished: remove its whole subtree.
-                edits.removals.append(id)
+        // Phase 2c — diff each shallow-relisted directory against its baseline
+        // children (in memory, cheap). Vanished child → remove its subtree; new
+        // child → deep-scan if directory-like, else a prebuilt leaf; changed
+        // leaf → record replacement; a type flip (file↔dir) removes then re-adds;
+        // an existing directory-like child is left untouched (its own interior
+        // changes are separately named by FSEvents and relisted on their own).
+        // Directories re-read successfully are now known readable, so a stale
+        // permission/error warning at exactly that path is pruned (warnings
+        // deeper inside, which this relist did not re-walk, are left to their
+        // own relist when FSEvents names them).
+        var relistedDirectoryPaths: [String] = []
+        // Warnings a full scan would emit for unreadable children encountered
+        // during the shallow relists, folded into the finished snapshot.
+        var inlineWarnings: [ScanWarning] = []
+        for shallow in shallowRelists {
+            let relist = shallow.relist
+            let dirID = relist.dirID
+            if deepRootSet.contains(dirID) || store.isNodeOrDescendant(dirID, of: deepRootSet) {
                 continue
             }
-            let baselineIsDirectory = baselineChild.isDirectory
-            if baselineIsDirectory && live.isDirectoryLike {
-                // Existing directory-like child: deep changes ride the normal
-                // event→subtree mapping; the relist leaves it untouched.
-                continue
-            }
-            if !baselineIsDirectory && !live.isDirectoryLike {
-                // Existing leaf: replace its record only when it actually moved.
-                if let leaf = live.leafRecord, !Self.leafRecordsMatch(baselineChild, leaf) {
-                    edits.fileReplacements.append((id: id, store: FileTreeStore(root: leaf)))
+            relistedDirectoryPaths.append(dirID)
+            let baselineChildren = store.children(of: dirID)
+            var baselineChildByID = [String: FileNodeRecord](minimumCapacity: baselineChildren.count)
+            for child in baselineChildren { baselineChildByID[child.id] = child }
+            var liveChildByID = [String: ScanEngine.ShallowChild](minimumCapacity: relist.liveChildren.count)
+            for child in relist.liveChildren { liveChildByID[child.url.path] = child }
+
+            for (id, baselineChild) in baselineChildByID {
+                guard let live = liveChildByID[id] else {
+                    edits.removals.append(id)
+                    continue
                 }
-                continue
+                // An unreadable child collapses to its inaccessible node inline
+                // (no subtree walk), exactly what a full scan produces: the whole
+                // baseline subtree it may have had is replaced by the childless
+                // node, and the full scan's warning rides along.
+                if live.isUnavailable {
+                    if let node = live.leafRecord {
+                        let changed = store.containsChildren(id: id)
+                            || !Self.leafRecordsMatch(baselineChild, node)
+                        if changed {
+                            edits.fileReplacements.append((id: id, store: FileTreeStore(root: node)))
+                        }
+                    }
+                    if let warning = live.warning { inlineWarnings.append(warning) }
+                    continue
+                }
+                let baselineIsDirectory = baselineChild.isDirectory
+                if baselineIsDirectory && live.isDirectoryLike {
+                    continue
+                }
+                if !baselineIsDirectory && !live.isDirectoryLike {
+                    if let leaf = live.leafRecord, !Self.leafRecordsMatch(baselineChild, leaf) {
+                        edits.fileReplacements.append((id: id, store: FileTreeStore(root: leaf)))
+                    }
+                    continue
+                }
+                edits.removals.append(id)
+                appendInsertion(for: live, parentID: dirID, into: &edits)
             }
-            // Type changed (file↔directory): remove the old node, scan/insert
-            // the new one — same as a full scan would produce.
-            edits.removals.append(id)
-            try appendInsertion(for: live, into: &edits)
-        }
-        for live in liveChildren where baselineChildByID[live.url.path] == nil {
-            // Brand-new direct child.
-            try appendInsertion(for: live, into: &edits)
+            for live in relist.liveChildren where baselineChildByID[live.url.path] == nil {
+                if live.isUnavailable {
+                    if let node = live.leafRecord {
+                        edits.prebuiltInsertions.append((parentID: dirID, store: FileTreeStore(root: node)))
+                    }
+                    if let warning = live.warning { inlineWarnings.append(warning) }
+                    continue
+                }
+                appendInsertion(for: live, parentID: dirID, into: &edits)
+            }
+
+            // Refresh the directory's own record from the fresh own-metadata the
+            // relist already read, so the spliced tree matches what a full scan
+            // would read for every own-field — not just mtime. A directory that
+            // became accessible between scans (FSEvents names it, the relist
+            // reads its children) must lose its stale inaccessible flag and take
+            // the fresh fileIdentity/linkCount/isPackage too; keeping only mtime
+            // left it displaying children while still marked inaccessible.
+            // Totals are re-derived by the splice.
+            if let meta = relist.ownMetadata,
+               meta.lastModified != relist.node.lastModified
+                || meta.fileIdentity != relist.node.fileIdentity
+                || meta.linkCount != relist.node.linkCount
+                || meta.isPackage != relist.node.isPackage
+                || meta.isReadable != relist.node.isSelfAccessible {
+                edits.recordOverrides[dirID] = relist.node.refreshingOwnMetadata(meta)
+            }
         }
 
-        // Reconcile deep subtree scans against removals: a subtree under a
-        // removed child must not be scanned or spliced.
+        // Phase 4 — reconcile against removals. Collapse the discovered removals
+        // to disjoint roots, then drop any edit at or under a removed subtree:
+        // the ancestor's removal already accounts for it, and keeping it would
+        // splice an edit onto a node that no longer exists.
         if !edits.removals.isEmpty {
-            let removedSet = Set(edits.removals)
+            let collapsedRemovals = store.topLevelNodeIDs(from: edits.removals)
+            let removedSet = Set(collapsedRemovals)
+            edits.removals = collapsedRemovals
+            edits.fileReplacements.removeAll { store.isNodeOrDescendant($0.id, of: removedSet) }
+            edits.prebuiltInsertions.removeAll { store.isNodeOrDescendant($0.parentID, of: removedSet) }
+            edits.recordOverrides = edits.recordOverrides.filter {
+                !store.isNodeOrDescendant($0.key, of: removedSet)
+            }
             edits.subtreeScans.removeAll { request in
-                guard case .replace(let baselineID) = request.role else { return false }
-                return removedSet.contains(baselineID)
-                    || baseline.treeStore.hasAncestor(in: removedSet, of: baselineID)
+                switch request.role {
+                case .replace(let baselineID):
+                    return store.isNodeOrDescendant(baselineID, of: removedSet)
+                case .insertUnder(let parentID):
+                    return store.isNodeOrDescendant(parentID, of: removedSet)
+                }
             }
         }
 
-        // Refresh the root's own record (mtime moves whenever its membership
-        // does); totals are re-derived by the splice. Skip when unchanged.
-        var refreshedRoot: FileNodeRecord?
-        if let liveRootMeta = engine.rootDirectoryMetadata(of: target.url) {
-            let baselineRoot = baseline.treeStore.root
-            if liveRootMeta.lastModified != baselineRoot.lastModified {
-                refreshedRoot = baselineRoot.replacingLastModified(liveRootMeta.lastModified)
-            }
-        }
-        edits.refreshedRootRecord = refreshedRoot
-
-        // Nothing actually moved (the root event was spurious churn): advance
-        // the checkpoint over the retained baseline, like `.noChanges`.
-        if edits.isEmpty {
-            log("root relist for \(target.id): no membership change; checkpoint advanced")
+        // Nothing actually moved (the events were spurious churn): advance the
+        // checkpoint over the retained baseline, like `.noChanges` — unless a
+        // relisted directory just cleared a stale warning of its own, which
+        // still needs the pruning pass below.
+        let relistedPathSet = Set(relistedDirectoryPaths)
+        let hasStaleWarningToPrune = baseline.scanWarnings.contains { relistedPathSet.contains($0.path) }
+        if edits.isEmpty && !hasStaleWarningToPrune {
+            log("relist for \(target.id): no change; checkpoint advanced")
             var metrics = Self.metrics(from: baseline.aggregateStats)
             metrics.currentPath = target.url.path
             metrics.recalculateProgress(isComplete: true)
@@ -432,7 +567,7 @@ public final class IncrementalScanService: Sendable {
             continuation.yield(.progress(metrics))
             continuation.yield(.finished(ScanSnapshot(
                 target: target,
-                treeStore: baseline.treeStore,
+                treeStore: store,
                 startedAt: startedAt,
                 finishedAt: Date(),
                 scanWarnings: baseline.scanWarnings,
@@ -444,6 +579,9 @@ public final class IncrementalScanService: Sendable {
             return
         }
 
+        // The subtrees leaving the baseline (replaced deep re-walks, removed
+        // children, replaced leaf files): their old totals are subtracted from
+        // the progress seed and their stale warnings pruned.
         let replacedRootPaths = edits.subtreeScans.compactMap { request -> String? in
             if case .replace(let baselineID) = request.role { return baselineID }
             return nil
@@ -451,7 +589,8 @@ public final class IncrementalScanService: Sendable {
         try await applyRelistEdits(
             edits,
             replacedRootPaths: replacedRootPaths,
-            isRootRelist: true,
+            relistedDirectoryPaths: relistedDirectoryPaths,
+            inlineWarnings: inlineWarnings,
             target: target,
             options: options,
             behavior: behavior,
@@ -463,30 +602,32 @@ public final class IncrementalScanService: Sendable {
         )
     }
 
-    /// Builds an insertion (a new direct child of the root): a scan request for
-    /// a directory, or a prebuilt one-node store for a leaf.
+    /// Records a new child of the relisted directory `parentID`: a scan request
+    /// for a directory-like child (deep-enumerated at the right depth), or a
+    /// prebuilt one-node store for a leaf.
     private nonisolated func appendInsertion(
         for live: ScanEngine.ShallowChild,
-        into edits: inout RootRelistEdits
-    ) throws {
+        parentID: String,
+        into edits: inout DirectoryRelistEdits
+    ) {
         if live.isDirectoryLike {
             edits.subtreeScans.append(SubtreeScanRequest(
-                role: .insertUnderRoot,
+                role: .insertUnder(parentID: parentID),
                 baselineID: live.url.path
             ))
         } else if let leaf = live.leafRecord {
-            edits.prebuiltInsertions.append(FileTreeStore(root: leaf))
+            edits.prebuiltInsertions.append((parentID: parentID, store: FileTreeStore(root: leaf)))
         }
     }
 
-    /// Scans every requested subtree, seeds the strip from the retained
-    /// baseline totals, splices the whole batch of edits in one pass, and emits
-    /// the finished snapshot. Shared by the plain subtree rescan and the root
-    /// relist; `isRootRelist` selects the splice primitive and the log line.
+    /// Scans every requested subtree (forced deep re-walks and new child
+    /// directories), seeds the strip from the retained baseline totals, splices
+    /// the whole batch of edits in one pass, and emits the finished snapshot.
     private nonisolated func applyRelistEdits(
-        _ edits: RootRelistEdits,
+        _ edits: DirectoryRelistEdits,
         replacedRootPaths: [String],
-        isRootRelist: Bool,
+        relistedDirectoryPaths: [String],
+        inlineWarnings: [ScanWarning],
         target: ScanTarget,
         options: ScanOptions,
         behavior: ScanEngine.ScanBehavior,
@@ -565,11 +706,12 @@ public final class IncrementalScanService: Sendable {
                 // Depth in the baseline tree, so depth-gated auto-summarization
                 // fires exactly as the original full scan's traversal did.
                 baseDepth = baseline.treeStore.path(to: baselineID).count - 1
-            case .insertUnderRoot:
+            case .insertUnder(let parentID):
                 url = URL(filePath: request.baselineID, directoryHint: .isDirectory)
                 name = ScanTarget.displayName(for: url)
-                // A direct child of the scan root sits at depth 1.
-                baseDepth = 1
+                // One below the parent directory's baseline depth, so a new
+                // subtree summarizes exactly where a full scan's traversal would.
+                baseDepth = baseline.treeStore.path(to: parentID).count
             }
             requests.append(ResolvedScanRequest(
                 index: requests.count,
@@ -638,7 +780,9 @@ public final class IncrementalScanService: Sendable {
         )
 
         var replacements = edits.fileReplacements
-        var insertions = edits.prebuiltInsertions
+        var insertions = edits.prebuiltInsertions.map {
+            FileTreeStore.SubtreeInsertion(parentID: $0.parentID, store: $0.store)
+        }
         var newWarnings: [ScanWarning] = []
         for outcome in outcomes.sorted(by: { $0.index < $1.index }) {
             newWarnings.append(contentsOf: outcome.snapshot.scanWarnings)
@@ -649,8 +793,10 @@ public final class IncrementalScanService: Sendable {
             switch outcome.role {
             case .replace(let baselineID):
                 replacements.append((id: baselineID, store: outcome.snapshot.treeStore))
-            case .insertUnderRoot:
-                insertions.append(outcome.snapshot.treeStore)
+            case .insertUnder(let parentID):
+                insertions.append(FileTreeStore.SubtreeInsertion(
+                    parentID: parentID, store: outcome.snapshot.treeStore
+                ))
             }
         }
 
@@ -686,18 +832,11 @@ public final class IncrementalScanService: Sendable {
                 "rescan.splice",
                 detail: "baselineNodes=\(baseline.treeStore.nodeCount)"
             ) {
-                if isRootRelist {
-                    return try baseline.treeStore.applyingRootRelist(
-                        refreshedRootRecord: edits.refreshedRootRecord,
-                        removingChildren: edits.removals,
-                        insertingChildren: insertions,
-                        replacements: replacements,
-                        spliceProgress: spliceProgress,
-                        cancellationCheck: { try Task.checkCancellation() }
-                    )
-                }
-                return try baseline.treeStore.replacingSubtrees(
-                    replacements,
+                try baseline.treeStore.applyingDirectoryRelist(
+                    recordOverrides: edits.recordOverrides,
+                    removingSubtrees: edits.removals,
+                    insertions: insertions,
+                    replacements: replacements,
                     spliceProgress: spliceProgress,
                     cancellationCheck: { try Task.checkCancellation() }
                 )
@@ -710,7 +849,7 @@ public final class IncrementalScanService: Sendable {
         guard let spliced else {
             return try await forwardFullScan(
                 target: target, options: options,
-                reason: isRootRelist ? .rootRelistFailed : .spliceFailed,
+                reason: .spliceFailed,
                 continuation: continuation, floor: floor
             )
         }
@@ -718,13 +857,10 @@ public final class IncrementalScanService: Sendable {
         let warnings = ScanSnapshot.mergedWarningsPruningReplacedSubtrees(
             existing: baseline.scanWarnings,
             replacedRootPaths: replacedRootPaths,
-            additional: newWarnings
+            prunedExactPaths: relistedDirectoryPaths,
+            additional: newWarnings + inlineWarnings
         )
-        if isRootRelist {
-            log("relisted root for \(target.id): -\(edits.removals.count) +\(insertions.count) ~\(replacements.count) subtree(s)")
-        } else {
-            log("rescanned \(replacements.count) subtree(s) for \(target.id)")
-        }
+        log("relisted \(target.id): -\(edits.removals.count) +\(insertions.count) ~\(replacements.count)")
 
         // aggregateStats is lazy after a splice; this access is a full-tree
         // pass and deserves its own timing.
@@ -871,10 +1007,12 @@ public final class IncrementalScanService: Sendable {
 
 /// How a scanned subtree's finished store folds into the splice.
 enum SubtreeScanRole: Sendable {
-    /// Replace the existing baseline subtree with this id.
+    /// Replace the existing baseline subtree with this id — a deep re-walk of a
+    /// coalesced/summarized subtree, or the rescan of a directory whose type
+    /// flipped in place.
     case replace(baselineID: String)
-    /// Graft as a brand-new direct child of the scan root.
-    case insertUnderRoot
+    /// Graft as a brand-new child of the surviving directory `parentID`.
+    case insertUnder(parentID: String)
 }
 
 /// One subtree the relist must re-enumerate. `baselineID` is the store id it
@@ -884,19 +1022,22 @@ struct SubtreeScanRequest {
     let baselineID: String
 }
 
-/// The full set of topology edits one root relist (or plain subtree rescan)
-/// applies in a single splice: subtrees to scan, direct children to drop,
-/// prebuilt leaf inserts/replacements, and the root's refreshed record.
-struct RootRelistEdits {
+/// The full set of topology edits one directory-relist batch applies in a
+/// single splice: subtrees to scan (deep re-walks and new child directories),
+/// subtrees to drop, prebuilt leaf inserts, changed direct-child leaf
+/// replacements, and the refreshed own-records of relisted directories.
+/// Insertions and record refreshes are keyed by the parent/target directory,
+/// so the batch spans any depth, not just the scan root.
+struct DirectoryRelistEdits {
     var subtreeScans: [SubtreeScanRequest] = []
     var removals: [String] = []
-    var prebuiltInsertions: [FileTreeStore] = []
+    var prebuiltInsertions: [(parentID: String, store: FileTreeStore)] = []
     var fileReplacements: [(id: String, store: FileTreeStore)] = []
-    var refreshedRootRecord: FileNodeRecord?
+    var recordOverrides: [String: FileNodeRecord] = [:]
 
     var isEmpty: Bool {
         subtreeScans.isEmpty && removals.isEmpty && prebuiltInsertions.isEmpty
-            && fileReplacements.isEmpty && refreshedRootRecord == nil
+            && fileReplacements.isEmpty && recordOverrides.isEmpty
     }
 }
 

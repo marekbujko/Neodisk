@@ -4,7 +4,7 @@
 //
 //  The three sunburst Canvas layers: base rings (Equatable on the render
 //  version, so unrelated view updates skip redrawing), the selection
-//  overlay, and the hover overlay. Ported from Radix.
+//  overlay, and the hover overlay.
 //
 
 import SunburstCore

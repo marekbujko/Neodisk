@@ -2,7 +2,7 @@
 //  SunburstLayout.swift
 //  SunburstCore
 //
-//  Sunburst ring layout and grouping. Ported from Radix; adapted to represent
+//  Sunburst ring layout and grouping. Adapted to represent
 //  volume free/hidden space as synthetic top-ring segments. Layout emits
 //  geometry + color tokens only — final fills resolve in a separate `styled`
 //  pass (kept in NeodiskUI, which knows the app's palettes), so color changes

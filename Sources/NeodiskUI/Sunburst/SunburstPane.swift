@@ -111,7 +111,7 @@ struct SunburstPane: View {
     // MARK: - Color style
 
     /// The active tab's coloring, mirroring `treemapColorMode` semantics:
-    /// Largest gets Radix branch hues, Age the ramp with the same reference
+    /// Largest gets branch hues, Age the ramp with the same reference
     /// date as the treemap, everything else kind colors — with the active
     /// tab's highlight dimming baked in. The statistics panel is the legend
     /// for the kind/age lenses, so hiding it reverts the sunburst to its
@@ -255,7 +255,7 @@ struct SunburstPane: View {
         model.hoveredCellIsHiddenSpace = false
     }
 
-    /// Sunburst drills are pure navigation (DaisyDisk-style): a successful
+    /// Sunburst drills are pure navigation: a successful
     /// drill clears the selection so the breadcrumb tracks the drill root —
     /// keeping a stale selection (drillIn preserves one inside the new root,
     /// which suits the treemap's outline) reads as "that file is still

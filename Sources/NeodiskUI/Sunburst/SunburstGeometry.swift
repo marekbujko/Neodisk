@@ -26,14 +26,14 @@ extension FileNodeRecord {
 }
 
 /// How sunburst segments are colored, derived from the active analysis tab:
-/// Radix's branch-hue algorithm on Largest (folders colored, files gray,
+/// The branch-hue algorithm on Largest (folders colored, files gray,
 /// colorblind palette honored), the treemap's kind/age semantics on the
 /// other tabs. Every mode resolves its final fill (including highlight
 /// dimming) into `SunburstSegment.fillRGB` via the `styled` pass; the
 /// styler's token fallback only covers segments without a node.
 struct SunburstColorStyle: Equatable, Sendable {
     enum Mode: Equatable, Sendable {
-        /// Radix branch hues — stable per scan-root branch (Largest tab).
+        /// Branch hues — stable per scan-root branch (Largest tab).
         case branch
         /// Kind catalog colors, directories neutral (Kinds/Duplicates tabs).
         case kind

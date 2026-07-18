@@ -11,10 +11,18 @@
 import Foundation
 
 nonisolated enum IncrementalRescanPlanner {
-    /// Changed-subtree count above which a full scan wins: hundreds of
-    /// sub-scans plus a batch splice cost more than one traversal, and the
-    /// progress story degrades.
+    /// Deep-rescan (recursive re-walk) subtree count above which a full scan
+    /// wins: hundreds of recursive sub-scans plus a batch splice cost more than
+    /// one traversal, and the progress story degrades. Shallow relists are far
+    /// cheaper (one readdir each), so they get a much larger budget below.
     static let defaultMaxSubtrees = 128
+
+    /// Shallow-relist directory count above which a full scan wins. Each relist
+    /// is a single directory read, so this is generous — scattered churn across
+    /// thousands of directories is still a fraction of a full `/` traversal
+    /// (hundreds of thousands of directories) — but bounded so a pathological
+    /// journal can't turn into a directory-read storm rivaling the full scan.
+    static let defaultMaxRelistDirectories = 4096
 
     static func plan(
         events: [FileSystemChangeEvent],
@@ -23,18 +31,26 @@ nonisolated enum IncrementalRescanPlanner {
         options: ScanOptions,
         behavior: ScanEngine.ScanBehavior,
         exclusionMatcher: ScanExclusionMatcher,
-        maxSubtrees: Int = defaultMaxSubtrees
+        maxSubtrees: Int = defaultMaxSubtrees,
+        maxRelistDirectories: Int = defaultMaxRelistDirectories
     ) -> IncrementalRescanPlan {
         let targetPath = target.id
-        var matchedRootIDs: [String] = []
-        var matchedRootIDSet = Set<String>()
-        /// Set when an event names the scan root itself or a membership change
-        /// directly under it. Rather than discard the baseline (the old
-        /// `.fullScan(.changedScanRoot)` bail, which fired constantly from
-        /// ambient churn in `~` / volume roots), the service shallow-relists
-        /// the root directory. Deep changes in the same window still map to
-        /// their subtrees and ride along in the same plan.
-        var needsRootRelist = false
+        /// Materialized directories to shallow-relist (one readdir + diff each),
+        /// preserving first-seen order. NOT coalesced: a directory and its
+        /// changed subdirectory are both relisted independently, which is the
+        /// whole point — scattered churn no longer collapses into a re-walk of a
+        /// high-mass common ancestor.
+        var shallowRootIDs: [String] = []
+        var shallowRootIDSet = Set<String>()
+        /// Subtrees FSEvents semantics force a recursive re-walk for: a
+        /// hierarchical coalesce (MustScanSubDirs) or an auto-summarized /
+        /// package directory whose interior the baseline never materialized.
+        var deepRootIDs: [String] = []
+        var deepRootIDSet = Set<String>()
+        /// The scan root's own membership or record moved; it is shallow-relisted
+        /// like any other directory. Deferred to the end so it is added exactly
+        /// once regardless of how many root-level events name it.
+        var rootMembershipChanged = false
         /// Candidate paths whose ancestor walk already ran — event bursts
         /// name the same few directories thousands of times.
         var resolvedCandidates = Set<String>()
@@ -55,7 +71,7 @@ nonisolated enum IncrementalRescanPlanner {
                 if event.flags.contains(.mustScanSubdirectories) {
                     return .fullScan(.changedScanRoot)
                 }
-                needsRootRelist = true
+                rootMembershipChanged = true
                 continue
             }
 
@@ -99,33 +115,54 @@ nonisolated enum IncrementalRescanPlanner {
                 if event.flags.contains(.mustScanSubdirectories) {
                     return .fullScan(.changedScanRoot)
                 }
-                needsRootRelist = true
+                rootMembershipChanged = true
                 continue
             }
-            if matchedRootIDSet.insert(matched).inserted {
-                matchedRootIDs.append(matched)
-                // Cheap early exit: collapse can only shrink the set, but a
-                // runaway window shouldn't accumulate unbounded roots first.
-                if matchedRootIDs.count > maxSubtrees * 4 {
-                    return .fullScan(.tooManyChangedSubtrees)
-                }
+
+            // A shallow relist can only reconstruct a directory whose children
+            // the baseline actually holds. A hierarchical coalesce, or a
+            // summarized/package directory (materialized as a childless leaf),
+            // must be recursively re-walked so its interior is rebuilt exactly
+            // as a full scan would — the coarse, preserved subtree path.
+            let matchedNode = baseline.node(id: matched)
+            let needsDeepRewalk = event.flags.contains(.mustScanSubdirectories)
+                || matchedNode?.isAutoSummarized == true
+                || matchedNode?.isPackage == true
+            if needsDeepRewalk {
+                if deepRootIDSet.insert(matched).inserted { deepRootIDs.append(matched) }
+            } else if shallowRootIDSet.insert(matched).inserted {
+                shallowRootIDs.append(matched)
+            }
+
+            // Cheap early exit: reconciliation below can only shrink the sets,
+            // but a runaway window shouldn't accumulate unbounded roots first.
+            if shallowRootIDs.count > maxRelistDirectories * 2
+                || deepRootIDs.count > maxSubtrees * 4 {
+                return .fullScan(.tooManyChangedSubtrees)
             }
         }
 
-        guard !matchedRootIDs.isEmpty else {
-            return needsRootRelist ? .relistRoot(subtreeRootIDs: []) : .noChanges
+        if rootMembershipChanged, shallowRootIDSet.insert(baseline.rootID).inserted {
+            shallowRootIDs.append(baseline.rootID)
         }
 
-        let collapsedRootIDs = baseline.topLevelNodeIDs(from: matchedRootIDs)
-        guard !collapsedRootIDs.isEmpty else {
-            return needsRootRelist ? .relistRoot(subtreeRootIDs: []) : .noChanges
+        // Deep roots are recursively re-walked, so they must be pairwise
+        // disjoint; a shallow relist at or under a deep root is redundant (the
+        // re-walk rebuilds it) and is dropped.
+        let deepCollapsed = baseline.topLevelNodeIDs(from: deepRootIDs)
+        let deepSet = Set(deepCollapsed)
+        let relistDirIDs = deepSet.isEmpty
+            ? shallowRootIDs
+            : shallowRootIDs.filter { !baseline.isNodeOrDescendant($0, of: deepSet) }
+
+        guard !relistDirIDs.isEmpty || !deepCollapsed.isEmpty else {
+            return .noChanges
         }
-        guard collapsedRootIDs.count <= maxSubtrees else {
+        guard relistDirIDs.count <= maxRelistDirectories,
+              deepCollapsed.count <= maxSubtrees else {
             return .fullScan(.tooManyChangedSubtrees)
         }
-        return needsRootRelist
-            ? .relistRoot(subtreeRootIDs: collapsedRootIDs)
-            : .rescanSubtrees(collapsedRootIDs)
+        return .relistDirectories(dirIDs: relistDirIDs, deepRescanRootIDs: deepCollapsed)
     }
 
     // MARK: - Event interpretation

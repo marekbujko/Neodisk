@@ -281,8 +281,7 @@ struct IncrementalScanServiceTests {
     /// The changed subtree is rescanned in isolation — where the shared file
     /// looks like an unlinked file (its twin is out of scope) — so the splice
     /// must re-run global hard-link deduplication to keep the accounting
-    /// identical to a from-scratch scan. Ported from Radix's
-    /// testIncrementalRescanMatchesFullScanForHardLinksAcrossSubtrees.
+    /// identical to a from-scratch scan.
     @Test func incrementalSpliceMatchesFreshFullScanForHardLinksAcrossSubtrees() async throws {
         let root = try makeHardLinkTree()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -339,7 +338,7 @@ struct IncrementalScanServiceTests {
             behavior: behavior,
             exclusionMatcher: matcher
         )
-        #expect(plan == .rescanSubtrees([target.id + "/Z-Changed"]))
+        #expect(plan == .relistDirectories(dirIDs: [target.id + "/Z-Changed"], deepRescanRootIDs: []))
 
         let rescanned = try #require(try await finishedSnapshot(
             from: service.rescan(target: target, options: options, baselineProvider: { baseline })
@@ -431,12 +430,14 @@ struct IncrementalScanServiceTests {
         #expect(first.isCheckingChanges)
         #expect(progress.drop(while: \.isCheckingChanges).allSatisfy { !$0.isCheckingChanges })
 
-        // The counters then open at the baseline totals minus the subtree
-        // being rescanned, not at zero.
-        let betaNode = try #require(baseline.treeStore.node(id: target.id + "/beta"))
+        // The counters then open at the baseline totals of everything the
+        // relist retains, not at zero. This churn only inserts a new file (the
+        // shallow relist of beta re-reads its membership, nothing leaves the
+        // tree), so the seed is the full baseline and grows as the insertion
+        // scans in.
         let seed = try #require(progress.first { !$0.isCheckingChanges })
-        #expect(seed.filesVisited == baseline.aggregateStats.fileCount - betaNode.descendantFileCount)
-        #expect(seed.bytesDiscovered == baseline.aggregateStats.totalAllocatedSize - betaNode.allocatedSize)
+        #expect(seed.filesVisited == baseline.aggregateStats.fileCount)
+        #expect(seed.bytesDiscovered == baseline.aggregateStats.totalAllocatedSize)
 
         // The bar opens at the retained share of the baseline's bytes and
         // never moves backward from there.
@@ -518,9 +519,9 @@ struct IncrementalScanServiceTests {
         provider.setHistory(.success(FileSystemEventHistory(events: events)))
 
         // The event window resolves to a root relist, never a full scan.
-        guard case .relistRoot = plannedResult(
+        guard case .relistDirectories(let dirIDs, _) = plannedResult(
             events: events, target: target, baseline: baseline.treeStore, options: options
-        ) else {
+        ), dirIDs.contains(target.id) else {
             Issue.record("expected a root relist plan")
             return
         }
@@ -562,9 +563,9 @@ struct IncrementalScanServiceTests {
         ]
         provider.setHistory(.success(FileSystemEventHistory(events: events)))
 
-        guard case .relistRoot = plannedResult(
+        guard case .relistDirectories(let dirIDs, _) = plannedResult(
             events: events, target: target, baseline: baseline.treeStore, options: options
-        ) else {
+        ), dirIDs.contains(target.id) else {
             Issue.record("expected a root relist plan")
             return
         }
@@ -604,9 +605,9 @@ struct IncrementalScanServiceTests {
         ]
         provider.setHistory(.success(FileSystemEventHistory(events: events)))
 
-        guard case .relistRoot = plannedResult(
+        guard case .relistDirectories(let dirIDs, _) = plannedResult(
             events: events, target: target, baseline: baseline.treeStore, options: options
-        ) else {
+        ), dirIDs.contains(target.id) else {
             Issue.record("expected a root relist plan")
             return
         }
@@ -637,12 +638,17 @@ struct IncrementalScanServiceTests {
         let baseline = try #require(try await finishedSnapshot(
             from: service.scan(target: target, options: options)
         ))
-        // beta is deleted, but the journal only names a change INSIDE it, so the
-        // planner targets beta as a subtree rescan; its sub-scan then fails and
-        // the service falls back to a full scan after progress has advanced.
+        // beta is deleted, and the journal hierarchically coalesces on it
+        // (MustScanSubDirs), so the planner forces a deep re-walk of beta; that
+        // sub-scan then fails on the missing directory and the service falls
+        // back to a full scan after progress has advanced.
         try FileManager.default.removeItem(at: root.appending(path: "beta", directoryHint: .isDirectory))
         provider.setHistory(.success(FileSystemEventHistory(events: [
-            FileSystemChangeEvent(path: target.id + "/beta/b.bin", eventID: 15, flags: []),
+            FileSystemChangeEvent(
+                path: target.id + "/beta",
+                eventID: 15,
+                flags: [.itemIsDirectory, .mustScanSubdirectories]
+            ),
         ])))
 
         var progress: [ScanMetrics] = []
@@ -761,7 +767,7 @@ struct IncrementalScanServiceTests {
         #expect(provider.recordedRequests.isEmpty)
     }
 
-    @Test func vanishedSubtreeFallsBackToFullScan() async throws {
+    @Test func vanishedRelistTargetIsRemovedNotFullScanned() async throws {
         let root = try makeTemporaryTree()
         defer { try? FileManager.default.removeItem(at: root) }
         let target = ScanTarget(url: root)
@@ -774,8 +780,9 @@ struct IncrementalScanServiceTests {
         ))
 
         // beta is deleted on disk but the journal only reports a change
-        // INSIDE it, so the planner targets a directory whose sub-scan hits
-        // a missing root — the recover-not-throw path (Radix 08d06c2).
+        // INSIDE it, so the planner targets beta itself for a relist; the relist
+        // finds it gone and removes it in place, matching a fresh scan without
+        // escalating to a full traversal.
         let beta = root.appending(path: "beta", directoryHint: .isDirectory)
         try FileManager.default.removeItem(at: beta)
         provider.setHistory(.success(FileSystemEventHistory(events: [
@@ -824,8 +831,11 @@ struct IncrementalScanServiceTests {
             incrementalCheckpoint: scanned.incrementalCheckpoint
         )
 
+        // The journal names the warned directory itself (its readability
+        // changed); relisting it re-verifies it and prunes the stale warning,
+        // while the untouched warning elsewhere in the tree survives.
         provider.setHistory(.success(FileSystemEventHistory(events: [
-            FileSystemChangeEvent(path: target.id + "/alpha/a.bin", eventID: 15, flags: []),
+            FileSystemChangeEvent(path: target.id + "/alpha/nested", eventID: 15, flags: [.itemIsDirectory]),
         ])))
         let rescanned = try #require(try await finishedSnapshot(
             from: service.rescan(target: target, options: options, baselineProvider: { baseline })

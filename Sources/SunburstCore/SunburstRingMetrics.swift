@@ -2,7 +2,7 @@
 //  SunburstRingMetrics.swift
 //  SunburstCore
 //
-//  The single source of truth for sunburst ring radii. DaisyDisk renders the
+//  The single source of truth for sunburst ring radii. The chart renders the
 //  deepest levels as THINNER arcs so the outer detail takes less radial space
 //  and the chart reads better; this computes that taper once and everything —
 //  the layout, the drill/zoom remap, and (transitively, via the segment radii
@@ -30,7 +30,7 @@ public struct SunburstRingMetrics: Sendable, Equatable {
     public static let penultimateRingRatio: Double = 2.0 / 3.0
     public static let lastRingRatio: Double = 4.0 / 9.0
     /// Depth layers past the body render as fixed thin detail rings at the
-    /// very edge (DaisyDisk's outer slivers), at most this many.
+    /// very edge (the outer slivers), at most this many.
     public static let fixedThinRingCount = 2
     /// Each fixed thin ring's band as a fraction of the chart radius. The
     /// cosmetic `ringGap` comes out of the band, so the drawn sliver is

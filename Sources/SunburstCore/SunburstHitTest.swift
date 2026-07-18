@@ -4,7 +4,7 @@
 //
 //  Polar hit-testing over laid-out segments. Points and sizes are plain
 //  Doubles in the chart's local pixel space (origin top-left); NeodiskUI adds
-//  thin CGPoint/CGSize overloads. Ported from Radix.
+//  thin CGPoint/CGSize overloads.
 //
 //  Stdlib only apart from `atan2` (point → angle), imported from the platform
 //  math library rather than Foundation to keep the module Embedded-Swift

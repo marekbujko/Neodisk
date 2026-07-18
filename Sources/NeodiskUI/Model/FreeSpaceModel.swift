@@ -3,7 +3,7 @@
 //  Neodisk
 //
 //  The synthetic space next to the scanned tree: free space of the scanned
-//  volume (or cloud quota remainder) and DaisyDisk-style hidden space. The
+//  volume (or cloud quota remainder) and hidden space. The
 //  sunburst always renders both for volume scans; the treemap adds them only
 //  behind the Settings toggle. Owned by NeodiskViewModel as `model.freeSpace`.
 //
@@ -19,7 +19,7 @@ final class FreeSpaceModel {
     /// The sunburst always renders it; the treemap keeps the Settings toggle
     /// (default off) — see `treemapFreeSpaceBytes`.
     private(set) var freeSpaceBytes: Int64?
-    /// DaisyDisk-style "hidden space" of the scanned volume: capacity that is
+    /// "Hidden space" of the scanned volume: capacity that is
     /// neither free nor accounted for by the finished scan (purgeable space,
     /// local snapshots, files the scan could not read). Same gates as
     /// `freeSpaceBytes`, plus a complete snapshot — mid-scan the unscanned

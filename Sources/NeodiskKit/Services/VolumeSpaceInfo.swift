@@ -46,7 +46,7 @@ public struct VolumeSpaceInfo: Equatable, Sendable {
         max(0, totalCapacity - availableCapacity)
     }
 
-    /// DaisyDisk-style hidden space: used capacity the scan did not account
+    /// Hidden space: used capacity the scan did not account
     /// for (unreadable paths, other users' homes, snapshot-held blocks).
     /// Nil when nothing remains — including when the scan over-counts, which
     /// must never surface as negative hidden space.

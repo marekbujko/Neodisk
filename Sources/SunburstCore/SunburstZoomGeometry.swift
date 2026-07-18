@@ -2,7 +2,7 @@
 //  SunburstZoomGeometry.swift
 //  SunburstCore
 //
-//  The polar remap math for the DaisyDisk-style drill transition: the clicked
+//  The polar remap math for the drill transition: the clicked
 //  segment's arc sweeps open to the full circle while its band morphs into the
 //  center disk, its descendants shift up one ring per level, and everything
 //  outside the arc collapses to zero width. Pure — the SwiftUI Canvas that

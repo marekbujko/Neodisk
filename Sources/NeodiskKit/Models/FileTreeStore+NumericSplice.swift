@@ -62,7 +62,7 @@ extension FileTreeStore {
             replacements: replacements,
             removingSubtreeIDs: [],
             insertions: [],
-            rootRecordOverride: nil,
+            recordOverrides: [:],
             spliceProgress: spliceProgress,
             cancellationCheck: cancellationCheck
         )
@@ -70,26 +70,31 @@ extension FileTreeStore {
 
     /// The unified numeric edit pass. `replacements` substitute existing
     /// subtrees, `removingSubtreeIDs` delete them, `insertions` graft new ones
-    /// under a surviving parent, and `rootRecordOverride` refreshes the root's
-    /// own record fields (its totals are re-derived by the rebuild). All edits
-    /// are validated up front, then applied in one copy + rebuild + rebalance.
+    /// under a surviving parent, and `recordOverrides` refresh the own-record
+    /// fields (mtime, identity) of surviving directories — the relisted
+    /// directories whose membership or metadata moved — keyed by node id (their
+    /// totals are re-derived by the rebuild). All edits are validated up front,
+    /// then applied in one copy + rebuild + rebalance.
     nonisolated func numericApplyEdits(
         replacements: [(id: String, store: FileTreeStore)],
         removingSubtreeIDs: [String],
         insertions: [SubtreeInsertion],
-        rootRecordOverride: FileNodeRecord?,
+        recordOverrides: [String: FileNodeRecord],
         spliceProgress: (Double) -> Void = { _ in },
         cancellationCheck: () throws -> Void
     ) throws -> NumericSpliceOutcome {
         try cancellationCheck()
         if replacements.isEmpty, removingSubtreeIDs.isEmpty, insertions.isEmpty,
-           rootRecordOverride == nil {
+           recordOverrides.isEmpty {
             return .spliced(self)
         }
         let storage = storage
         let oldCount = storage.count
 
-        if let rootRecordOverride, rootRecordOverride.id != rootID {
+        // Each override must name an existing node whose record it matches by
+        // id; a stored id mismatch is a caller bug, not a layout the dictionary
+        // path could rescue.
+        for (id, record) in recordOverrides where record.id != id || storage.index(of: id) == nil {
             return .unsupported
         }
 
@@ -331,11 +336,16 @@ extension FileTreeStore {
             }
         }
 
-        // The root is always the first kept node, so its refreshed record lands
-        // at index 0. Its totals are re-derived by the rebuild below when
-        // membership moved, and preserved as-is otherwise.
-        if let rootRecordOverride {
-            newNodes[0] = rootRecordOverride
+        // Refreshed own-records land on their surviving kept node (the root, at
+        // index 0, is just the common case). Totals are re-derived by the
+        // rebuild below for directories whose membership moved, and preserved
+        // as-is otherwise. An override that fell inside a removed or replaced
+        // range has no surviving node — a caller-side reconciliation bug — so
+        // hand the whole edit to the dictionary path rather than write astray.
+        for (id, record) in recordOverrides {
+            let newIndex = oldToNew[Int(storage.index(of: id)!)]
+            guard newIndex >= 0 else { return .unsupported }
+            newNodes[Int(newIndex)] = record
         }
 
         // Child layout: counts + prefix sums, then per-parent slot fills that

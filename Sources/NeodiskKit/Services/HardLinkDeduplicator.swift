@@ -483,6 +483,43 @@ extension FileNodeRecord {
         )
     }
 
+    /// The same directory record with its own-metadata fields refreshed from a
+    /// fresh read — used by the fine relist so a shallow-relisted directory
+    /// carries the identity/linkCount/package/accessibility/mtime a full scan
+    /// would read, not just its baseline copy. Totals are intentionally kept
+    /// from the baseline: the splice re-derives them for any directory whose
+    /// membership moved, and a directory whose membership did not move keeps its
+    /// correct baseline totals. `isAccessible` (a self ∧ children rollup) is set
+    /// from the refreshed self-accessibility combined with the baseline's
+    /// children-accessibility; the splice recomputes it from real spliced
+    /// children for every directory whose membership moved, which is the only
+    /// case in which children-accessibility can differ from the baseline.
+    nonisolated func refreshingOwnMetadata(_ metadata: NodeMetadata) -> FileNodeRecord {
+        let childrenAccessible = isSelfAccessible ? isAccessible : true
+        return FileNodeRecord(
+            id: id,
+            path: path,
+            name: name,
+            isDirectory: isDirectory,
+            isSymbolicLink: isSymbolicLink,
+            allocatedSize: allocatedSize,
+            unduplicatedAllocatedSize: unduplicatedAllocatedSize,
+            logicalSize: logicalSize,
+            descendantFileCount: descendantFileCount,
+            lastModified: metadata.lastModified,
+            fileIdentity: metadata.fileIdentity,
+            linkCount: metadata.linkCount,
+            isPackage: metadata.isPackage,
+            isAccessible: metadata.isReadable && childrenAccessible,
+            isSelfAccessible: metadata.isReadable,
+            isSynthetic: isSynthetic,
+            isAutoSummarized: isAutoSummarized,
+            isDataless: isDataless,
+            cloudOnlyLogicalSize: cloudOnlyLogicalSize,
+            cloneInfo: cloneInfo
+        )
+    }
+
     nonisolated func replacingAllocatedSize(
         _ allocatedSize: Int64,
         cloneInfo: CloneInfo?? = nil

@@ -552,7 +552,7 @@ extension FileTreeStore {
             replacements: replacements,
             removingSubtreeIDs: removingChildren,
             insertions: insertions,
-            rootRecordOverride: refreshedRootRecord,
+            recordOverrides: refreshedRootRecord.map { [rootID: $0] } ?? [:],
             spliceProgress: spliceProgress,
             cancellationCheck: cancellationCheck
         ) {
@@ -568,6 +568,42 @@ extension FileTreeStore {
                 replacements: replacements,
                 cancellationCheck: cancellationCheck
             )
+        }
+    }
+
+    /// Applies a batch of shallow directory relists as one all-or-nothing
+    /// topology transaction: `removingSubtrees` drop vanished nodes anywhere in
+    /// the tree, `insertions` graft brand-new children under their (surviving)
+    /// parent directory, `replacements` substitute existing subtrees (changed
+    /// leaf files and the deep re-walked subtrees), and `recordOverrides`
+    /// refresh the own-records of the relisted directories whose metadata moved.
+    /// Everything folds into a single ancestor rebuild + shared-size rebalance.
+    ///
+    /// Numeric fast path only: returns nil on any target/layout the numeric
+    /// splice declines (missing target, id collision, non-contiguous subtree),
+    /// so the incremental service escalates that rescan to a full scan rather
+    /// than risk a partial or stale splice. The dictionary paths remain the
+    /// randomized-equivalence oracles for the primitives this composes.
+    nonisolated func applyingDirectoryRelist(
+        recordOverrides: [String: FileNodeRecord],
+        removingSubtrees: [String],
+        insertions: [SubtreeInsertion],
+        replacements: [(id: String, store: FileTreeStore)],
+        spliceProgress: (Double) -> Void = { _ in },
+        cancellationCheck: () throws -> Void
+    ) throws -> FileTreeStore? {
+        switch try numericApplyEdits(
+            replacements: replacements,
+            removingSubtreeIDs: removingSubtrees,
+            insertions: insertions,
+            recordOverrides: recordOverrides,
+            spliceProgress: spliceProgress,
+            cancellationCheck: cancellationCheck
+        ) {
+        case .spliced(let store):
+            return store
+        case .invalidTarget, .unsupported:
+            return nil
         }
     }
 

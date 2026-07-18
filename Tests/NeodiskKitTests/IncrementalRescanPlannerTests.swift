@@ -53,7 +53,8 @@ struct IncrementalRescanPlannerTests {
         _ events: [FileSystemChangeEvent],
         options: ScanOptions? = nil,
         behavior: ScanEngine.ScanBehavior = .standard,
-        maxSubtrees: Int = IncrementalRescanPlanner.defaultMaxSubtrees
+        maxSubtrees: Int = IncrementalRescanPlanner.defaultMaxSubtrees,
+        maxRelistDirectories: Int = IncrementalRescanPlanner.defaultMaxRelistDirectories
     ) -> IncrementalRescanPlan {
         let effectiveOptions = options ?? self.options
         return IncrementalRescanPlanner.plan(
@@ -69,7 +70,8 @@ struct IncrementalRescanPlannerTests {
                 cloudStorageRootPath: effectiveOptions.cloudStorageRootPath,
                 iCloudDriveRootPath: effectiveOptions.iCloudDriveRootPath
             ),
-            maxSubtrees: maxSubtrees
+            maxSubtrees: maxSubtrees,
+            maxRelistDirectories: maxRelistDirectories
         )
     }
 
@@ -87,19 +89,19 @@ struct IncrementalRescanPlannerTests {
 
     @Test func fileEventRescansItsContainingDirectory() {
         let result = plan([event("/scan/docs/report.txt", [.itemCreated])])
-        #expect(result == .rescanSubtrees(["/scan/docs"]))
+        #expect(result == .relistDirectories(dirIDs: ["/scan/docs"], deepRescanRootIDs: []))
     }
 
     @Test func directoryContentEventRescansTheDirectoryItself() {
         // No membership-change flags: the directory's own listing may have
         // shifted (e.g. attribute or coalesced content change).
         let result = plan([event("/scan/docs/nested", [.itemIsDirectory])])
-        #expect(result == .rescanSubtrees(["/scan/docs/nested"]))
+        #expect(result == .relistDirectories(dirIDs: ["/scan/docs/nested"], deepRescanRootIDs: []))
     }
 
     @Test func directoryRenameRescansTheParent() {
         let result = plan([event("/scan/docs/nested", [.itemIsDirectory, .itemRenamed])])
-        #expect(result == .rescanSubtrees(["/scan/docs"]))
+        #expect(result == .relistDirectories(dirIDs: ["/scan/docs"], deepRescanRootIDs: []))
     }
 
     @Test func nestedCandidatesCollapseToTheirAncestor() {
@@ -107,38 +109,38 @@ struct IncrementalRescanPlannerTests {
             event("/scan/docs", [.mustScanSubdirectories]),
             event("/scan/docs/nested/deep.txt", [.itemCreated]),
         ])
-        #expect(result == .rescanSubtrees(["/scan/docs"]))
+        #expect(result == .relistDirectories(dirIDs: [], deepRescanRootIDs: ["/scan/docs"]))
     }
 
     @Test func unknownPathMapsToNearestMaterializedAncestor() {
         // /scan/docs/nested/brand-new/file.bin: neither the file nor its
         // parent exists in the baseline; the walk lands on nested.
         let result = plan([event("/scan/docs/nested/brand-new/file.bin", [.itemCreated])])
-        #expect(result == .rescanSubtrees(["/scan/docs/nested"]))
+        #expect(result == .relistDirectories(dirIDs: ["/scan/docs/nested"], deepRescanRootIDs: []))
     }
 
     @Test func eventInsidePackageRescansThePackageLeaf() {
         let result = plan([event("/scan/apps/Tool.app/Contents/Info.plist", [.itemCreated])])
-        #expect(result == .rescanSubtrees(["/scan/apps/Tool.app"]))
+        #expect(result == .relistDirectories(dirIDs: [], deepRescanRootIDs: ["/scan/apps/Tool.app"]))
     }
 
     @Test func eventInsideAutoSummarizedDirectoryRescansThatDirectory() {
-        // Divergence from Radix: auto-summarized dirs are the most volatile
+        // Auto-summarized dirs are the most volatile
         // (caches, node_modules) — they re-summarize as a unit instead of
         // forcing a full scan.
         let result = plan([event("/scan/caches/tmp/blob", [.itemRemoved])])
-        #expect(result == .rescanSubtrees(["/scan/caches"]))
+        #expect(result == .relistDirectories(dirIDs: [], deepRescanRootIDs: ["/scan/caches"]))
     }
 
     @Test func changeDirectlyUnderScanRootRelistsTheRoot() {
         // A membership change directly under the scan root used to discard the
         // whole baseline; now it shallow-relists the root instead.
         let result = plan([event("/scan/top.txt", [.itemRemoved])])
-        #expect(result == .relistRoot(subtreeRootIDs: []))
+        #expect(result == .relistDirectories(dirIDs: ["/scan"], deepRescanRootIDs: []))
     }
 
     @Test func eventOnScanRootRelistsTheRoot() {
-        #expect(plan([event("/scan", [.itemIsDirectory, .itemRenamed])]) == .relistRoot(subtreeRootIDs: []))
+        #expect(plan([event("/scan", [.itemIsDirectory, .itemRenamed])]) == .relistDirectories(dirIDs: ["/scan"], deepRescanRootIDs: []))
     }
 
     @Test func rootRelistCarriesDeepSubtreesFromTheSameWindow() {
@@ -148,7 +150,7 @@ struct IncrementalRescanPlannerTests {
             event("/scan/top.txt", [.itemRemoved]),
             event("/scan/docs/report.txt", [.itemCreated]),
         ])
-        #expect(result == .relistRoot(subtreeRootIDs: ["/scan/docs"]))
+        #expect(result == .relistDirectories(dirIDs: ["/scan/docs", "/scan"], deepRescanRootIDs: []))
     }
 
     @Test func hierarchicalCoalesceOnScanRootStillFullScans() {
@@ -187,7 +189,7 @@ struct IncrementalRescanPlannerTests {
         var withHidden = ScanOptions()
         withHidden.includeHiddenFiles = true
         let result = plan([event("/scan/docs/nested/.secret", [.itemCreated])], options: withHidden)
-        #expect(result == .rescanSubtrees(["/scan/docs/nested"]))
+        #expect(result == .relistDirectories(dirIDs: ["/scan/docs/nested"], deepRescanRootIDs: []))
     }
 
     @Test func excludedPathsAreSkipped() {
@@ -197,14 +199,26 @@ struct IncrementalRescanPlannerTests {
         #expect(result == .noChanges)
     }
 
-    @Test func tooManySubtreesFallsBackToFullScan() {
-        // Two distinct roots with a cap of one.
+    @Test func tooManyDeepSubtreesFallsBackToFullScan() {
+        // Two distinct deep (package/summarized) re-walk roots with a cap of one.
+        let result = plan(
+            [
+                event("/scan/apps/Tool.app/x", [.itemCreated]),
+                event("/scan/caches/blob", [.itemCreated]),
+            ],
+            maxSubtrees: 1
+        )
+        #expect(result == .fullScan(.tooManyChangedSubtrees))
+    }
+
+    @Test func tooManyRelistDirectoriesFallsBackToFullScan() {
+        // Two distinct shallow-relist directories with a relist cap of one.
         let result = plan(
             [
                 event("/scan/docs/report.txt", [.itemCreated]),
-                event("/scan/apps/Tool.app/x", [.itemCreated]),
+                event("/scan/apps/newfile.txt", [.itemCreated]),
             ],
-            maxSubtrees: 1
+            maxRelistDirectories: 1
         )
         #expect(result == .fullScan(.tooManyChangedSubtrees))
     }
@@ -213,7 +227,7 @@ struct IncrementalRescanPlannerTests {
         let events = (0..<1_000).map {
             event("/scan/docs/report.txt", [.itemCreated], id: UInt64($0 + 1))
         }
-        #expect(plan(events) == .rescanSubtrees(["/scan/docs"]))
+        #expect(plan(events) == .relistDirectories(dirIDs: ["/scan/docs"], deepRescanRootIDs: []))
     }
 
     @Test func rootVolumePrivateVarEventsRescanTheirSubtree() {
@@ -250,7 +264,7 @@ struct IncrementalRescanPlannerTests {
                 iCloudDriveRootPath: ScanOptions.defaultICloudDriveRootPath
             )
         )
-        #expect(result == .rescanSubtrees(["/private/var/folders"]))
+        #expect(result == .relistDirectories(dirIDs: ["/private/var/folders"], deepRescanRootIDs: []))
     }
 
     @Test func startupVolumeInternalsAreSkippedUnderRootBehavior() {

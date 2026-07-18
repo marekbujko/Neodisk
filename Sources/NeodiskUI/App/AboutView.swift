@@ -11,7 +11,7 @@ enum AppLinks {
     static let repository = URL(string: "https://github.com/tkslucas/Neodisk")!
     static let reportIssue = URL(string: "https://github.com/tkslucas/Neodisk/issues/new/choose")!
     static let sponsor = URL(string: "https://github.com/sponsors/tkslucas")!
-    /// The license page also carries the Radix attribution notice.
+    /// The license page also carries the third-party attribution notice.
     static let license = URL(string: "https://github.com/tkslucas/Neodisk/blob/main/LICENSE")!
     static let privacy = URL(string: "https://neodisk.app/privacy")!
 }
